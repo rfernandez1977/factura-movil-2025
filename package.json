@@ -1,0 +1,51 @@
+{
+  "name": "bolt-expo-starter",
+  "main": "expo-router/entry",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "start": "EXPO_NO_TELEMETRY=1 expo start",
+    "dev": "EXPO_NO_TELEMETRY=1 expo start",
+    "build:web": "EXPO_NO_TELEMETRY=1 expo export --platform web",
+    "analyze": "ANALYZE=true expo export --platform web",
+    "lint": "expo lint",
+    "test:api": "node test/api-test.ts"
+  },
+  "dependencies": {
+    "@react-native-async-storage/async-storage": "2.1.2",
+    "@react-native-community/datetimepicker": "8.4.1",
+    "axios": "^1.6.7",
+    "crypto-js": "^4.2.0",
+    "expo": "53.0.20",
+    "expo-constants": "~17.1.7",
+    "expo-font": "^13.0.3",
+    "expo-linking": "~7.1.7",
+    "expo-print": "~14.1.4",
+    "expo-router": "~5.1.4",
+    "expo-sharing": "~13.1.5",
+    "expo-status-bar": "~2.2.3",
+    "expo-system-ui": "~5.0.10",
+    "lucide-react-native": "^0.489.0",
+    "react": "19.0.0",
+    "react-native": "0.79.5",
+    "react-native-chart-kit": "^6.12.0",
+    "react-native-reanimated": "~3.17.4",
+    "react-native-safe-area-context": "5.4.0",
+    "react-native-screens": "~4.11.1",
+    "react-native-svg": "^15.11.1",
+    "react-native-web": "^0.20.0",
+    "react-native-webview": "13.13.5",
+    "react-dom": "19.0.0"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.25.2",
+    "@types/crypto-js": "^4.2.2",
+    "@types/react": "~18.3.12",
+    "@types/react-datepicker": "^4.19.6",
+    "file-loader": "^6.2.0",
+    "image-webpack-loader": "^8.1.0",
+    "typescript": "^5.3.3",
+    "webpack-bundle-analyzer": "^4.10.2"
+  },
+  "packageManager": "yarn@1.22.22+sha512.a6b2f7906b721bba3d67d4aff083df04dad64c399707841b7acf00f6b133b7ac24255f2652fa22ae3534329dc6180534e98d17432037ff6fd140556e2bb3137e"
+}
