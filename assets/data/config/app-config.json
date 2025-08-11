@@ -1,0 +1,42 @@
+{
+  "app": {
+    "name": "Factura Móvil 2025",
+    "version": "1.0.2",
+    "description": "Aplicación móvil para gestión de facturación y ventas",
+    "company": "Factura Móvil",
+    "support": {
+      "email": "soporte@facturamovil.cl",
+      "phone": "+56 9 1234 5678",
+      "website": "https://facturamovil.cl"
+    }
+  },
+  "api": {
+    "baseUrl": "http://produccion.facturamovil.cl",
+    "timeout": 30000,
+    "retryAttempts": 3,
+    "headers": {
+      "Content-Type": "application/json",
+      "Accept": "application/json"
+    }
+  },
+  "features": {
+    "bluetoothPrinting": true,
+    "offlineMode": true,
+    "pushNotifications": false,
+    "analytics": false,
+    "darkMode": true
+  },
+  "limits": {
+    "maxProductsPerInvoice": 50,
+    "maxClients": 1000,
+    "maxInvoicesPerDay": 100,
+    "fileUploadSize": "10MB"
+  },
+  "defaults": {
+    "currency": "CLP",
+    "language": "es",
+    "timezone": "America/Santiago",
+    "dateFormat": "DD/MM/YYYY",
+    "decimalPlaces": 0
+  }
+}

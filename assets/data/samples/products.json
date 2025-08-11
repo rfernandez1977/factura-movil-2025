@@ -1,0 +1,72 @@
+[
+  {
+    "id": 1,
+    "name": "Laptop HP Pavilion",
+    "description": "Laptop HP Pavilion 15.6 pulgadas, Intel Core i5, 8GB RAM, 256GB SSD",
+    "category": "Electrónicos",
+    "price": 599990,
+    "stock": 15,
+    "sku": "LAP-HP-001",
+    "barcode": "1234567890123",
+    "image": "laptop-hp-pavilion.jpg",
+    "active": true,
+    "created_at": "2024-12-01T10:00:00Z",
+    "updated_at": "2024-12-01T10:00:00Z"
+  },
+  {
+    "id": 2,
+    "name": "Mouse Inalámbrico Logitech",
+    "description": "Mouse inalámbrico Logitech M185, 1000 DPI, batería incluida",
+    "category": "Accesorios",
+    "price": 15990,
+    "stock": 50,
+    "sku": "MOU-LOG-001",
+    "barcode": "1234567890124",
+    "image": "mouse-logitech-m185.jpg",
+    "active": true,
+    "created_at": "2024-12-01T10:00:00Z",
+    "updated_at": "2024-12-01T10:00:00Z"
+  },
+  {
+    "id": 3,
+    "name": "Teclado Mecánico RGB",
+    "description": "Teclado mecánico gaming con switches Cherry MX Red y iluminación RGB",
+    "category": "Accesorios",
+    "price": 89990,
+    "stock": 8,
+    "sku": "TEC-MEC-001",
+    "barcode": "1234567890125",
+    "image": "teclado-mecanico-rgb.jpg",
+    "active": true,
+    "created_at": "2024-12-01T10:00:00Z",
+    "updated_at": "2024-12-01T10:00:00Z"
+  },
+  {
+    "id": 4,
+    "name": "Monitor Samsung 24\"",
+    "description": "Monitor Samsung 24 pulgadas, Full HD, 60Hz, panel IPS",
+    "category": "Monitores",
+    "price": 129990,
+    "stock": 12,
+    "sku": "MON-SAM-001",
+    "barcode": "1234567890126",
+    "image": "monitor-samsung-24.jpg",
+    "active": true,
+    "created_at": "2024-12-01T10:00:00Z",
+    "updated_at": "2024-12-01T10:00:00Z"
+  },
+  {
+    "id": 5,
+    "name": "Cable HDMI 2.0",
+    "description": "Cable HDMI 2.0 de alta velocidad, 2 metros, soporte 4K",
+    "category": "Cables",
+    "price": 8990,
+    "stock": 100,
+    "sku": "CAB-HDM-001",
+    "barcode": "1234567890127",
+    "image": "cable-hdmi-2m.jpg",
+    "active": true,
+    "created_at": "2024-12-01T10:00:00Z",
+    "updated_at": "2024-12-01T10:00:00Z"
+  }
+]

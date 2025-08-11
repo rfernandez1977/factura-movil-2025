@@ -1,47 +1,44 @@
-export default {
-  name: "Factura Móvil",
-  slug: "factura-movil",
-  version: "1.0.0",
-  orientation: "portrait",
-  icon: "./assets/images/icon.png",
-  userInterfaceStyle: "light",
-  splash: {
-    image: "./assets/images/favicon.png",
-    resizeMode: "contain",
-    backgroundColor: "#ffffff"
-  },
-  assetBundlePatterns: [
-    "**/*"
-  ],
-  ios: {
-    supportsTablet: true
-  },
-  android: {
-    adaptiveIcon: {
-      foregroundImage: "./assets/images/adaptive-icon.png",
+export default ({ config }) => ({
+    ...config,
+    name: "Factura Móvil",
+    slug: "factura-movil",
+    version: "1.0.0", // Versión visible de la app
+    orientation: "portrait",
+    icon: "./assets/icon.png",
+    scheme: "facturamovil", // Necesario para Expo Router y deep linking
+    userInterfaceStyle: "light",
+    splash: {
+      image: "./assets/splash.png",
+      resizeMode: "contain",
       backgroundColor: "#ffffff"
-    }
-  },
-  web: {
-    favicon: "./assets/images/favicon.png",
-    bundler: "metro",
-    // Optimize for web performance
-    output: "static",
-    // Optimize chunk sizes
-    optimization: {
-      splitChunks: true
-    }
-  },
-  plugins: [
-    [
-      "expo-router",
-      {
-        // Changed asyncRouting to asyncRoutes to fix the validation error
-        asyncRoutes: true
+    },
+    assetBundlePatterns: ["**/*"],
+    ios: {
+      supportsTablet: true,
+      bundleIdentifier: "com.rfernandez1977.facturamovil"
+    },
+    android: {
+      adaptiveIcon: {
+        foregroundImage: "./assets/adaptive-icon.png",
+        backgroundColor: "#ffffff"
+      },
+      package: "com.rfernandez1977.facturamovil",
+      versionCode: 1, // Incrementar cada vez que subas a Play Store
+      permissions: [
+        "INTERNET",
+        "CAMERA",
+        "READ_EXTERNAL_STORAGE",
+        "WRITE_EXTERNAL_STORAGE"
+      ]
+    },
+    extra: {
+      ...config.extra,
+      eas: {
+        projectId: "1a538017-5dcc-483c-9651-c41cc52047c9"
       }
-    ]
-  ],
-  experiments: {
-    tsconfigPaths: true
-  }
-};
+    },
+    experiments: {
+      typedRoutes: true // Optimiza Expo Router con TypeScript
+    }
+  });
+  
