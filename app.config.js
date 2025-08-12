@@ -4,11 +4,11 @@ export default ({ config }) => ({
     slug: "factura-movil",
     version: "1.0.0", // Versión visible de la app
     orientation: "portrait",
-    icon: "./assets/icon.png",
+    icon: "./assets/images/icon.png",
     scheme: "facturamovil", // Necesario para Expo Router y deep linking
     userInterfaceStyle: "light",
     splash: {
-      image: "./assets/splash.png",
+      image: "./assets/images/splash.png",
       resizeMode: "contain",
       backgroundColor: "#ffffff"
     },
@@ -19,7 +19,7 @@ export default ({ config }) => ({
     },
     android: {
       adaptiveIcon: {
-        foregroundImage: "./assets/adaptive-icon.png",
+        foregroundImage: "./assets/images/adaptive-icon.png",
         backgroundColor: "#ffffff"
       },
       package: "com.rfernandez1977.facturamovil",
