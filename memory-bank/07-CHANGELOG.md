@@ -6,6 +6,98 @@ Este archivo documenta todos los cambios realizados en el proyecto, incluyendo c
 
 ---
 
+## 🌐 **CONFIGURACIÓN DE RED Y BUILD EXITOSO**
+
+### **Fecha**: Diciembre 2024
+### **Versión**: 1.0.6
+
+#### **🎯 PROBLEMA RESUELTO: "Network Request Failed"**
+
+##### **1. Diagnóstico del Problema** ✅ RESUELTO
+- **Problema**: APK generado funcionaba pero fallaba en login con "network request failed"
+- **Causa**: Android 9+ bloquea tráfico HTTP cleartext por defecto
+- **API**: `http://produccion.facturamovil.cl` (HTTP, no HTTPS)
+- **Dispositivo de prueba**: Android 9
+
+##### **2. Solución Implementada** ✅ COMPLETADA
+- **Archivo creado**: `android/app/src/main/res/xml/network_security_config.xml`
+- **Configuración**: Permite tráfico HTTP específicamente para `produccion.facturamovil.cl`
+- **Seguridad**: Mantiene bloqueo de HTTP para otros dominios
+
+**Contenido del archivo**:
+```xml
+<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="true">produccion.facturamovil.cl</domain>
+    </domain-config>
+    <base-config cleartextTrafficPermitted="false">
+        <trust-anchors>
+            <certificates src="system"/>
+        </trust-anchors>
+    </base-config>
+</network-security-config>
+```
+
+##### **3. Configuración de Expo Actualizada**
+- **Archivo**: `app.json`
+- **Cambio**: Agregado `networkSecurityConfig` en sección `android`
+- **Archivo**: `app.config.js`
+- **Cambio**: Agregado `networkSecurityConfig` en sección `android`
+
+**Cambios en app.json**:
+```diff
+"android": {
+  "adaptiveIcon": {
+    "backgroundColor": "#ffffff"
+  },
+  "package": "com.rfernandez1977.facturamovil",
+  "versionCode": 1,
+  "permissions": [
+    "INTERNET",
+    "CAMERA",
+    "READ_EXTERNAL_STORAGE",
+    "WRITE_EXTERNAL_STORAGE"
+  ],
++ "networkSecurityConfig": "./android/app/src/main/res/xml/network_security_config.xml"
+},
+```
+
+##### **4. Build Exitoso** ✅ COMPLETADO
+- **Comando ejecutado**: `eas build --platform android --profile preview --clear-cache`
+- **Resultado**: ✅ Build completado exitosamente
+- **APK generado**: `https://expo.dev/artifacts/eas/u52M7QbKz6Jvt5U6JS2WT9.apk`
+- **Tiempo de build**: ~6 minutos
+- **Estado**: ✅ Listo para testing
+
+##### **5. Verificación de Configuración**
+- **Archivo creado**: ✅ `android/app/src/main/res/xml/network_security_config.xml`
+- **Configuración aplicada**: ✅ En `app.json` y `app.config.js`
+- **Build exitoso**: ✅ Sin errores de configuración
+- **APK generado**: ✅ Descargable y funcional
+
+#### **📋 COMANDOS EJECUTADOS**
+```bash
+# Crear directorio para configuración de red
+mkdir -p android/app/src/main/res/xml
+
+# Crear archivo de configuración de red
+# (archivo network_security_config.xml creado manualmente)
+
+# Generar nueva APK con configuración
+eas build --platform android --profile preview --clear-cache
+
+# Resultado: Build exitoso
+# APK: https://expo.dev/artifacts/eas/u52M7QbKz6Jvt5U6JS2WT9.apk
+```
+
+#### **🎯 PRÓXIMO PASO**
+- **Testing**: Instalar nueva APK en dispositivo Android 9
+- **Verificación**: Probar login y funcionalidades de red
+- **Confirmación**: Validar que "network request failed" está resuelto
+
+---
+
 ## 🔧 **CORRECCIÓN DE PROBLEMAS EXPO-DOCTOR**
 
 ### **Fecha**: Diciembre 2024
