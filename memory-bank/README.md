@@ -24,6 +24,7 @@ Este Memory Bank contiene la documentación completa del proyecto **Factura Móv
 - **Servicios API**: 8 endpoints
 - **Rutas configuradas**: 20+ pantallas
 - **Cobertura de documentación**: 100%
+- **Archivos de documentación**: 9 (incluyendo plan de logging)
 - **Commits realizados**: 3
 - **Builds exitosos**: 2 APKs generados
 - **Tiempo de trabajo**: Diciembre 2024
@@ -98,6 +99,14 @@ Este Memory Bank contiene la documentación completa del proyecto **Factura Móv
 - **Configuración de red Android 9+**
 - **Build APK exitoso**
 - **ESTADO FINAL**: Completamente documentado y funcional
+
+### **📋 [08-LOGGING-NETWORK-PLAN.md](./08-LOGGING-NETWORK-PLAN.md)**
+**Plan de Implementación - Logging y Red**
+- Plan detallado para sistema de logging
+- Diagnóstico de problemas de conexión
+- Arquitectura propuesta completa
+- Fases de implementación estructuradas
+- **ESTADO**: Documentado para implementación futura
 
 ---
 
@@ -308,6 +317,12 @@ EXPO_NO_TELEMETRY=1
 - Configuración de seguridad de red implementada
 - APK funcional generado exitosamente
 - Build completado sin errores
+
+### **✅ Plan de Logging y Diagnóstico** ⭐ NUEVO
+- Plan detallado para sistema de logging implementado
+- Arquitectura completa documentada
+- Diagnóstico de problemas de conexión estructurado
+- Fases de implementación definidas
 
 ---
 
