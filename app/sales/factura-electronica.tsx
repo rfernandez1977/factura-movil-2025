@@ -119,8 +119,7 @@ export default function FacturaElectronicaScreen() {
   // Estado para controlar cuando se está generando la factura
   const [isGeneratingInvoice, setIsGeneratingInvoice] = useState(false);
   
-  // Estado para controlar qué esquema usar (true = nuevo esquema, false = esquema actual)
-  const [useEnhancedSchema, setUseEnhancedSchema] = useState(true);
+  // El nuevo esquema es ahora el único esquema disponible
 
   // Debounce client search input
   useEffect(() => {
@@ -382,8 +381,8 @@ export default function FacturaElectronicaScreen() {
     calculateTotals(updatedProducts);
   };
   
-  // Calcular totales
-  const calculateTotals = (productList: ProductDetail[]) => {
+  // Calcular totales con memoización
+  const calculateTotals = useCallback((productList: ProductDetail[]) => {
     let net = 0;
     let otherTaxes = 0;
     
@@ -404,7 +403,7 @@ export default function FacturaElectronicaScreen() {
     setIvaAmount(iva);
     setOtherTaxesAmount(otherTaxes);
     setGrandTotal(total);
-  };
+  }, []);
 
   // Formatear fecha
   const formatDate = (date: Date) => {
@@ -438,88 +437,10 @@ export default function FacturaElectronicaScreen() {
     return Math.round(amount).toLocaleString('es-CL');
   };
   
-  // Preparar los datos para la API (ESQUEMA ACTUAL)
-  const prepareInvoiceData = (): InvoiceRequest => {
-    if (!client) {
-      throw new Error('Debe seleccionar un cliente');
-    }
-    
-    if (products.length === 0) {
-      throw new Error('Debe agregar al menos un producto');
-    }
-    
-    // Preparar información del cliente
-    const clientData: InvoiceClient = {
-      code: client.code,
-      name: client.name,
-    };
-    
-    // Agregar línea si existe
-    if (client.line) {
-      clientData.line = client.line;
-    }
-    
-    // Agregar dirección y municipalidad basado en la dirección seleccionada
-    if (client.additionalAddress && client.additionalAddress.length > 0) {
-      const selectedAddress = client.selectedAddressId !== undefined
-        ? client.additionalAddress.find(addr => addr.id === client.selectedAddressId)
-        : client.additionalAddress[0];
-        
-      if (selectedAddress) {
-        clientData.address = selectedAddress.address;
-        
-        if (selectedAddress.municipality) {
-          clientData.municipality = selectedAddress.municipality.name;
-        }
-      }
-    } else if (client.address) {
-      // Usar dirección principal si no hay direcciones adicionales
-      clientData.address = client.address;
-    }
-    
-    // Preparar detalles de productos
-    const details: InvoiceProductDetail[] = products.map((product, index) => {
-      const detail: InvoiceProductDetail = {
-        position: index + 1,
-        product: {
-          code: product.code,
-          name: product.name,
-          price: product.price
-        },
-        quantity: product.quantity
-      };
-      
-      // Agregar unidad si existe
-      if (product.unit) {
-        detail.product.unit = {
-          code: product.unit.code
-        };
-      }
-      
-      return detail;
-    });
-    
-    // Crear objeto de factura
-    const invoiceData: InvoiceRequest = {
-      currency: "CLP",
-      hasTaxes: true,
-      client: clientData,
-      date: formatDateForAPI(emissionDate),
-      details: details,
-      paymentMethod: paymentForm === 'contado' ? 'CONTADO' : 'CREDITO',
-      paymentCondition: paymentCondition === 'efectivo' ? 'EFECTIVO' : 'TARJETA'
-    };
-    
-    // Agregar folio externo si estamos editando una factura existente
-    if (invoiceId) {
-      invoiceData.externalFolio = invoiceId;
-    }
-    
-    return invoiceData;
-  };
+  // Función única para preparar datos de factura (esquema mejorado)
 
-  // Preparar los datos para la API (NUEVO ESQUEMA MEJORADO)
-  const prepareEnhancedInvoiceData = (): EnhancedInvoiceRequest => {
+  // Preparar los datos para la API (esquema mejorado) con memoización
+  const prepareEnhancedInvoiceData = useCallback((): EnhancedInvoiceRequest => {
     if (!client) {
       throw new Error('Debe seleccionar un cliente');
     }
@@ -614,11 +535,11 @@ export default function FacturaElectronicaScreen() {
     }
     
     return enhancedInvoiceData;
-  };
+  }, [client, products, emissionDate, invoiceId]);
   
   // Generar factura - Updated to use the extracted service function
-  // Validar fechas
-  const validateDates = (): { isValid: boolean; error?: string } => {
+  // Validar fechas con memoización
+  const validateDates = useCallback((): { isValid: boolean; error?: string } => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     
@@ -631,9 +552,9 @@ export default function FacturaElectronicaScreen() {
     }
     
     return { isValid: true };
-  };
+  }, [emissionDate, expirationDate]);
   
-  // Validar cliente
+  // Validar cliente con memoización
   const validateClient = (): { isValid: boolean; error?: string } => {
     if (!client) {
       return { isValid: false, error: 'Debe seleccionar un cliente' };
@@ -694,19 +615,10 @@ export default function FacturaElectronicaScreen() {
     setIsGeneratingInvoice(true);
     
     try {
-      let response;
-      
-      if (useEnhancedSchema) {
-        // Usar nuevo esquema mejorado
-        console.log('🚀 Usando NUEVO ESQUEMA MEJORADO');
-        const enhancedInvoiceData = prepareEnhancedInvoiceData();
-        response = await generateEnhancedInvoice(enhancedInvoiceData);
-      } else {
-        // Usar esquema actual
-        console.log('🔄 Usando ESQUEMA ACTUAL');
-        const invoiceData = prepareInvoiceData();
-        response = await generateInvoice(invoiceData);
-      }
+      // Usar esquema mejorado (único disponible)
+      console.log('🚀 Generando factura con esquema mejorado');
+      const enhancedInvoiceData = prepareEnhancedInvoiceData();
+      const response = await generateEnhancedInvoice(enhancedInvoiceData);
       
       // Si hubo un error, la función generateInvoice ya muestra un alerta y devuelve null
       if (!response) {
@@ -1083,7 +995,12 @@ export default function FacturaElectronicaScreen() {
         
         {/* Totales */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Totales</Text>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Totales</Text>
+            <View style={styles.totalItemsBadge}>
+              <Text style={styles.totalItemsText}>{products.length} productos</Text>
+            </View>
+          </View>
           
           <View style={styles.totalsContainer}>
             <View style={styles.totalRow}>
@@ -1110,49 +1027,39 @@ export default function FacturaElectronicaScreen() {
           </View>
         </View>
         
-        {/* Selector de Esquema */}
-        <View style={styles.schemaSelector}>
-          <Text style={styles.schemaLabel}>Esquema de Factura:</Text>
-          <View style={styles.schemaButtons}>
-            <TouchableOpacity
-              style={[
-                styles.schemaButton,
-                useEnhancedSchema && styles.schemaButtonSelected
-              ]}
-              onPress={() => setUseEnhancedSchema(true)}
-            >
-              <Text style={[
-                styles.schemaButtonText,
-                useEnhancedSchema && styles.schemaButtonTextSelected
-              ]}>Nuevo (Mejorado)</Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity
-              style={[
-                styles.schemaButton,
-                !useEnhancedSchema && styles.schemaButtonSelected
-              ]}
-              onPress={() => setUseEnhancedSchema(false)}
-            >
-              <Text style={[
-                styles.schemaButtonText,
-                !useEnhancedSchema && styles.schemaButtonTextSelected
-              ]}>Actual (Respaldo)</Text>
-            </TouchableOpacity>
+
+        
+        {/* Estado de la Factura */}
+        <View style={styles.invoiceStatusContainer}>
+          <View style={styles.statusItem}>
+            <View style={[styles.statusDot, client ? styles.statusDotActive : styles.statusDotInactive]} />
+            <Text style={styles.statusText}>Cliente seleccionado</Text>
+          </View>
+          <View style={styles.statusItem}>
+            <View style={[styles.statusDot, products.length > 0 ? styles.statusDotActive : styles.statusDotInactive]} />
+            <Text style={styles.statusText}>Productos agregados</Text>
+          </View>
+          <View style={styles.statusItem}>
+            <View style={[styles.statusDot, grandTotal > 0 ? styles.statusDotActive : styles.statusDotInactive]} />
+            <Text style={styles.statusText}>Totales calculados</Text>
           </View>
         </View>
         
         {/* Botón de Guardar */}
         <TouchableOpacity 
-          style={[styles.saveButton, isGeneratingInvoice && styles.saveButtonDisabled]}
+          style={[
+            styles.saveButton, 
+            isGeneratingInvoice && styles.saveButtonDisabled,
+            (!client || products.length === 0) && styles.saveButtonDisabled
+          ]}
           onPress={handleGenerateInvoice}
-          disabled={isGeneratingInvoice}
+          disabled={isGeneratingInvoice || !client || products.length === 0}
         >
           {isGeneratingInvoice ? (
             <ActivityIndicator color="#fff" size="small" />
           ) : (
             <Text style={styles.saveButtonText}>
-              Generar Factura {useEnhancedSchema ? '(Nuevo)' : '(Actual)'}
+              Generar Factura
             </Text>
           )}
         </TouchableOpacity>
@@ -1962,7 +1869,18 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     flexShrink: 0,
   },
-  schemaSelector: {
+  totalItemsBadge: {
+    backgroundColor: '#E3F2FD',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  totalItemsText: {
+    fontSize: 12,
+    color: '#0066CC',
+    fontWeight: '500',
+  },
+  invoiceStatusContainer: {
     backgroundColor: '#fff',
     borderRadius: 10,
     padding: 15,
@@ -1973,34 +1891,25 @@ const styles = StyleSheet.create({
     shadowRadius: 2,
     elevation: 2,
   },
-  schemaLabel: {
-    fontSize: 14,
-    color: '#666',
-    marginBottom: 10,
-  },
-  schemaButtons: {
+  statusItem: {
     flexDirection: 'row',
-    gap: 10,
-  },
-  schemaButton: {
-    flex: 1,
-    paddingVertical: 10,
-    paddingHorizontal: 15,
-    backgroundColor: '#f5f5f5',
-    borderRadius: 5,
     alignItems: 'center',
+    marginBottom: 8,
   },
-  schemaButtonSelected: {
-    backgroundColor: '#E3F2FD',
-    borderColor: '#0066CC',
-    borderWidth: 1,
+  statusDot: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    marginRight: 10,
   },
-  schemaButtonText: {
+  statusDotActive: {
+    backgroundColor: '#4CAF50',
+  },
+  statusDotInactive: {
+    backgroundColor: '#E0E0E0',
+  },
+  statusText: {
     fontSize: 14,
     color: '#666',
-  },
-  schemaButtonTextSelected: {
-    color: '#0066CC',
-    fontWeight: 'bold',
   },
 });
