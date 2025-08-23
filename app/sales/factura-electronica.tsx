@@ -15,8 +15,9 @@ import {
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { ArrowLeft, Calendar, CreditCard, User, MapPin, Plus, X, CircleMinus as MinusCircle, Search, Check } from 'lucide-react-native';
-import { api, Client, Product, InvoiceRequest, InvoiceProductDetail, InvoiceClient } from '../../services/api';
-import { generateInvoice } from '../../services/invoiceService';
+import DateTimePicker from '@react-native-community/datetimepicker';
+import { api, Client, Product, InvoiceRequest, InvoiceProductDetail, InvoiceClient, EnhancedInvoiceRequest } from '../../services/api';
+import { generateInvoice, generateEnhancedInvoice } from '../../services/invoiceService';
 
 // Interfaces
 interface ProductDetail {
@@ -97,7 +98,9 @@ export default function FacturaElectronicaScreen() {
   const [clientSearch, setClientSearch] = useState('');
   const [productSearch, setProductSearch] = useState('');
   const [isSearchingClient, setIsSearchingClient] = useState(false);
+  const [isSearchingProduct, setIsSearchingProduct] = useState(false);
   const [debouncedClientSearch, setDebouncedClientSearch] = useState('');
+  const [debouncedProductSearch, setDebouncedProductSearch] = useState('');
   
   // Para calendario
   const [showDatePicker, setShowDatePicker] = useState(false);
@@ -115,6 +118,9 @@ export default function FacturaElectronicaScreen() {
   
   // Estado para controlar cuando se está generando la factura
   const [isGeneratingInvoice, setIsGeneratingInvoice] = useState(false);
+  
+  // Estado para controlar qué esquema usar (true = nuevo esquema, false = esquema actual)
+  const [useEnhancedSchema, setUseEnhancedSchema] = useState(true);
 
   // Debounce client search input
   useEffect(() => {
@@ -124,6 +130,15 @@ export default function FacturaElectronicaScreen() {
 
     return () => clearTimeout(timer);
   }, [clientSearch]);
+
+  // Debounce product search input
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedProductSearch(productSearch);
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [productSearch]);
 
   // Search clients when debounced search term changes
   useEffect(() => {
@@ -160,6 +175,41 @@ export default function FacturaElectronicaScreen() {
 
     searchClients();
   }, [debouncedClientSearch, showClientModal]);
+
+  // Search products when debounced search term changes
+  useEffect(() => {
+    const searchProducts = async () => {
+      if (!showProductModal) return;
+      
+      if (debouncedProductSearch) {
+        setIsSearchingProduct(true);
+        try {
+          const data = await api.getProducts(true, debouncedProductSearch);
+          setProductsList(data);
+        } catch (error) {
+          console.error('Error searching products:', error);
+          // If API search fails, try local filtering
+          try {
+            const allProducts = await api.getProducts(false);
+            const filteredProducts = allProducts.filter(product => 
+              product.name.toLowerCase().includes(debouncedProductSearch.toLowerCase()) ||
+              product.code.toLowerCase().includes(debouncedProductSearch.toLowerCase())
+            );
+            setProductsList(filteredProducts);
+          } catch (err) {
+            Alert.alert('Error', 'No se pudieron buscar los productos');
+          }
+        } finally {
+          setIsSearchingProduct(false);
+        }
+      } else if (showProductModal) {
+        // If search is cleared, load all products
+        loadProducts();
+      }
+    };
+
+    searchProducts();
+  }, [debouncedProductSearch, showProductModal]);
   
   // Cargar clientes
   const loadClients = async () => {
@@ -189,11 +239,7 @@ export default function FacturaElectronicaScreen() {
     }
   };
   
-  // Filtrar productos por búsqueda
-  const filteredProducts = productsList.filter(
-    product => product.name.toLowerCase().includes(productSearch.toLowerCase()) || 
-               (product.code && product.code.toLowerCase().includes(productSearch.toLowerCase()))
-  );
+  // Los productos ya están filtrados por la API, no necesitamos filtro local
   
   // Seleccionar cliente
   const selectClient = (client: Client) => {
@@ -211,7 +257,7 @@ export default function FacturaElectronicaScreen() {
 
     // Add primary address if it exists
     if (client.address) {
-      newClient.additionalAddress.push({
+      newClient.additionalAddress!.push({
         id: 0,
         address: client.address,
         municipality: client.municipality
@@ -221,17 +267,17 @@ export default function FacturaElectronicaScreen() {
     // Add additional addresses if they exist
     if (client.additionalAddress && Array.isArray(client.additionalAddress)) {
       // Combine addresses, ensuring no duplicates by ID
-      const existingIds = newClient.additionalAddress.map(addr => addr.id);
+      const existingIds = newClient.additionalAddress!.map(addr => addr.id);
       const additionalAddresses = client.additionalAddress.filter(addr => !existingIds.includes(addr.id));
       
       newClient.additionalAddress = [
-        ...newClient.additionalAddress,
+        ...newClient.additionalAddress!,
         ...additionalAddresses
       ];
     }
 
     // Set the first address as selected by default
-    if (newClient.additionalAddress.length > 0) {
+    if (newClient.additionalAddress && newClient.additionalAddress.length > 0) {
       newClient.selectedAddressId = newClient.additionalAddress[0].id;
     }
 
@@ -257,12 +303,58 @@ export default function FacturaElectronicaScreen() {
     setShowProductModal(false);
   };
   
+  // Validar cantidad de producto
+  const validateProductQuantity = (quantity: string): { isValid: boolean; value: number; error?: string } => {
+    const sanitizedValue = quantity.replace(',', '.');
+    const numValue = parseFloat(sanitizedValue);
+    
+    if (isNaN(numValue)) {
+      return { isValid: false, value: 0, error: 'La cantidad debe ser un número válido' };
+    }
+    
+    if (numValue <= 0) {
+      return { isValid: false, value: 0, error: 'La cantidad debe ser mayor a 0' };
+    }
+    
+    if (numValue > 999999) {
+      return { isValid: false, value: 0, error: 'La cantidad no puede exceder 999,999' };
+    }
+    
+    return { isValid: true, value: numValue };
+  };
+  
+  // Validar precio de producto
+  const validateProductPrice = (price: number): { isValid: boolean; error?: string } => {
+    if (price <= 0) {
+      return { isValid: false, error: 'El precio debe ser mayor a 0' };
+    }
+    
+    if (price > 999999999) {
+      return { isValid: false, error: 'El precio no puede exceder 999,999,999' };
+    }
+    
+    return { isValid: true };
+  };
+  
   // Agregar producto
   const addProduct = () => {
     if (!selectedProduct) return;
     
-    // Parse quantity as float to support decimals
-    const quantity = parseFloat(productQuantity) || 1;
+    // Validar cantidad
+    const quantityValidation = validateProductQuantity(productQuantity);
+    if (!quantityValidation.isValid) {
+      Alert.alert('Error', quantityValidation.error || 'Cantidad inválida');
+      return;
+    }
+    
+    // Validar precio
+    const priceValidation = validateProductPrice(selectedProduct.price);
+    if (!priceValidation.isValid) {
+      Alert.alert('Error', priceValidation.error || 'Precio inválido');
+      return;
+    }
+    
+    const quantity = quantityValidation.value;
     const price = selectedProduct.price;
     const total = quantity * price;
     
@@ -323,6 +415,19 @@ export default function FacturaElectronicaScreen() {
     });
   };
   
+  // Manejar cambio de fecha en DatePicker
+  const handleDateChange = (event: any, selectedDate?: Date) => {
+    setShowDatePicker(false);
+    
+    if (selectedDate) {
+      if (datePickerMode === 'emission') {
+        setEmissionDate(selectedDate);
+      } else if (datePickerMode === 'expiration') {
+        setExpirationDate(selectedDate);
+      }
+    }
+  };
+  
   // Formatear fecha para API (YYYY-MM-DD)
   const formatDateForAPI = (date: Date) => {
     return date.toISOString().split('T')[0];
@@ -333,7 +438,7 @@ export default function FacturaElectronicaScreen() {
     return Math.round(amount).toLocaleString('es-CL');
   };
   
-  // Preparar los datos para la API
+  // Preparar los datos para la API (ESQUEMA ACTUAL)
   const prepareInvoiceData = (): InvoiceRequest => {
     if (!client) {
       throw new Error('Debe seleccionar un cliente');
@@ -412,28 +517,196 @@ export default function FacturaElectronicaScreen() {
     
     return invoiceData;
   };
-  
-  // Generar factura - Updated to use the extracted service function
-  const handleGenerateInvoice = async () => {
-    // Validar datos
+
+  // Preparar los datos para la API (NUEVO ESQUEMA MEJORADO)
+  const prepareEnhancedInvoiceData = (): EnhancedInvoiceRequest => {
     if (!client) {
-      Alert.alert('Error', 'Debe seleccionar un cliente');
-      return;
+      throw new Error('Debe seleccionar un cliente');
     }
     
     if (products.length === 0) {
-      Alert.alert('Error', 'Debe agregar al menos un producto');
+      throw new Error('Debe agregar al menos un producto');
+    }
+    
+    // Preparar información del cliente con esquema mejorado
+    const clientData: any = {
+      id: client.id,
+      code: client.code,
+      name: client.name,
+      email: client.email,
+      line: client.line,
+      additionalAddress: client.additionalAddress || []
+    };
+    
+    // Agregar dirección y municipalidad basado en la dirección seleccionada
+    if (client.additionalAddress && client.additionalAddress.length > 0) {
+      const selectedAddress = client.selectedAddressId !== undefined
+        ? client.additionalAddress.find(addr => addr.id === client.selectedAddressId)
+        : client.additionalAddress[0];
+        
+      if (selectedAddress) {
+        clientData.address = selectedAddress.address;
+        
+        if (selectedAddress.municipality) {
+          clientData.municipality = {
+            id: selectedAddress.municipality.id,
+            name: selectedAddress.municipality.name,
+            code: selectedAddress.municipality.code
+          };
+        }
+      }
+    } else if (client.address) {
+      // Usar dirección principal si no hay direcciones adicionales
+      clientData.address = client.address;
+    }
+    
+    // Preparar detalles de productos con esquema mejorado
+    const details = products.map((product) => {
+      const detail = {
+        product: {
+          id: product.id,
+          code: product.code,
+          name: product.name,
+          price: product.price,
+          unit: {
+            id: product.unit?.id || 1,
+            name: product.unit?.name || 'Unidad',
+            code: product.unit?.code || 'Unid'
+          },
+          category: {
+            id: product.category?.id || 1,
+            code: product.category?.code || '001',
+            name: product.category?.name || 'Default Category',
+            otherTax: product.category?.otherTax
+          }
+        },
+        quantity: product.quantity
+      };
+      
+      return detail;
+    });
+    
+    // Calcular totales
+    const netTotal = products.reduce((sum, product) => sum + product.total, 0);
+    const taxes = netTotal * 0.19; // IVA 19%
+    const otherTaxes = products.reduce((sum, product) => {
+      if (product.category?.otherTax) {
+        return sum + (product.total * (product.category.otherTax.percent / 100));
+      }
+      return sum;
+    }, 0);
+    
+    // Crear objeto de factura con esquema mejorado
+    const enhancedInvoiceData: EnhancedInvoiceRequest = {
+      hasTaxes: true,
+      client: clientData,
+      details: details,
+      netTotal: netTotal,
+      date: formatDateForAPI(emissionDate),
+      taxes: taxes,
+      otherTaxes: otherTaxes > 0 ? otherTaxes : undefined,
+      exemptTotal: 0
+    };
+    
+    // Agregar folio externo si estamos editando una factura existente
+    if (invoiceId) {
+      enhancedInvoiceData.externalFolio = invoiceId;
+    }
+    
+    return enhancedInvoiceData;
+  };
+  
+  // Generar factura - Updated to use the extracted service function
+  // Validar fechas
+  const validateDates = (): { isValid: boolean; error?: string } => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    if (emissionDate < today) {
+      return { isValid: false, error: 'La fecha de emisión no puede ser anterior a hoy' };
+    }
+    
+    if (expirationDate && expirationDate <= emissionDate) {
+      return { isValid: false, error: 'La fecha de vencimiento debe ser posterior a la fecha de emisión' };
+    }
+    
+    return { isValid: true };
+  };
+  
+  // Validar cliente
+  const validateClient = (): { isValid: boolean; error?: string } => {
+    if (!client) {
+      return { isValid: false, error: 'Debe seleccionar un cliente' };
+    }
+    
+    if (!client.name || client.name.trim().length === 0) {
+      return { isValid: false, error: 'El cliente debe tener un nombre válido' };
+    }
+    
+    if (!client.code || client.code.trim().length === 0) {
+      return { isValid: false, error: 'El cliente debe tener un código válido' };
+    }
+    
+    return { isValid: true };
+  };
+  
+  // Validar productos
+  const validateProducts = (): { isValid: boolean; error?: string } => {
+    if (products.length === 0) {
+      return { isValid: false, error: 'Debe agregar al menos un producto' };
+    }
+    
+    for (const product of products) {
+      if (product.quantity <= 0) {
+        return { isValid: false, error: `La cantidad del producto "${product.name}" debe ser mayor a 0` };
+      }
+      
+      if (product.price <= 0) {
+        return { isValid: false, error: `El precio del producto "${product.name}" debe ser mayor a 0` };
+      }
+    }
+    
+    return { isValid: true };
+  };
+  
+  const handleGenerateInvoice = async () => {
+    // Validar fechas
+    const dateValidation = validateDates();
+    if (!dateValidation.isValid) {
+      Alert.alert('Error', dateValidation.error || 'Error en las fechas');
+      return;
+    }
+    
+    // Validar cliente
+    const clientValidation = validateClient();
+    if (!clientValidation.isValid) {
+      Alert.alert('Error', clientValidation.error || 'Error en el cliente');
+      return;
+    }
+    
+    // Validar productos
+    const productValidation = validateProducts();
+    if (!productValidation.isValid) {
+      Alert.alert('Error', productValidation.error || 'Error en los productos');
       return;
     }
     
     setIsGeneratingInvoice(true);
     
     try {
-      // Preparar datos para la API
-      const invoiceData = prepareInvoiceData();
+      let response;
       
-      // Usar el servicio centralizado para generar la factura
-      const response = await generateInvoice(invoiceData);
+      if (useEnhancedSchema) {
+        // Usar nuevo esquema mejorado
+        console.log('🚀 Usando NUEVO ESQUEMA MEJORADO');
+        const enhancedInvoiceData = prepareEnhancedInvoiceData();
+        response = await generateEnhancedInvoice(enhancedInvoiceData);
+      } else {
+        // Usar esquema actual
+        console.log('🔄 Usando ESQUEMA ACTUAL');
+        const invoiceData = prepareInvoiceData();
+        response = await generateInvoice(invoiceData);
+      }
       
       // Si hubo un error, la función generateInvoice ya muestra un alerta y devuelve null
       if (!response) {
@@ -489,6 +762,15 @@ export default function FacturaElectronicaScreen() {
       setDebouncedClientSearch('');
     }
   }, [showClientModal]);
+
+  // Handle product modal open
+  useEffect(() => {
+    if (showProductModal) {
+      // Reset search when modal opens
+      setProductSearch('');
+      setDebouncedProductSearch('');
+    }
+  }, [showProductModal]);
   
   return (
     <KeyboardAvoidingView
@@ -828,6 +1110,38 @@ export default function FacturaElectronicaScreen() {
           </View>
         </View>
         
+        {/* Selector de Esquema */}
+        <View style={styles.schemaSelector}>
+          <Text style={styles.schemaLabel}>Esquema de Factura:</Text>
+          <View style={styles.schemaButtons}>
+            <TouchableOpacity
+              style={[
+                styles.schemaButton,
+                useEnhancedSchema && styles.schemaButtonSelected
+              ]}
+              onPress={() => setUseEnhancedSchema(true)}
+            >
+              <Text style={[
+                styles.schemaButtonText,
+                useEnhancedSchema && styles.schemaButtonTextSelected
+              ]}>Nuevo (Mejorado)</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity
+              style={[
+                styles.schemaButton,
+                !useEnhancedSchema && styles.schemaButtonSelected
+              ]}
+              onPress={() => setUseEnhancedSchema(false)}
+            >
+              <Text style={[
+                styles.schemaButtonText,
+                !useEnhancedSchema && styles.schemaButtonTextSelected
+              ]}>Actual (Respaldo)</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+        
         {/* Botón de Guardar */}
         <TouchableOpacity 
           style={[styles.saveButton, isGeneratingInvoice && styles.saveButtonDisabled]}
@@ -837,7 +1151,9 @@ export default function FacturaElectronicaScreen() {
           {isGeneratingInvoice ? (
             <ActivityIndicator color="#fff" size="small" />
           ) : (
-            <Text style={styles.saveButtonText}>Generar Factura</Text>
+            <Text style={styles.saveButtonText}>
+              Generar Factura {useEnhancedSchema ? '(Nuevo)' : '(Actual)'}
+            </Text>
           )}
         </TouchableOpacity>
       </ScrollView>
@@ -934,7 +1250,11 @@ export default function FacturaElectronicaScreen() {
                 placeholder="Buscar por nombre o código"
               />
               <View style={styles.searchIconContainer}>
-                <Search size={18} color="#666" />
+                {isSearchingProduct ? (
+                  <ActivityIndicator size="small" color="#0066CC" />
+                ) : (
+                  <Search size={18} color="#666" />
+                )}
               </View>
             </View>
             
@@ -942,7 +1262,7 @@ export default function FacturaElectronicaScreen() {
               <ActivityIndicator size="large" color="#0066CC" style={{ marginTop: 20 }} />
             ) : (
               <FlatList
-                data={filteredProducts}
+                data={productsList}
                 keyExtractor={(item) => item.id.toString()}
                 renderItem={({ item }) => (
                   <TouchableOpacity
@@ -1026,6 +1346,18 @@ export default function FacturaElectronicaScreen() {
           </View>
         </View>
       </Modal>
+      
+      {/* DatePicker Modal */}
+      {showDatePicker && (
+        <DateTimePicker
+          value={datePickerMode === 'emission' ? emissionDate : (expirationDate || new Date())}
+          mode="date"
+          display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+          onChange={handleDateChange}
+          maximumDate={new Date(Date.now() + 365 * 24 * 60 * 60 * 1000)} // Máximo 1 año en el futuro
+          minimumDate={new Date(Date.now() - 365 * 24 * 60 * 60 * 1000)} // Mínimo 1 año en el pasado
+        />
+      )}
     </KeyboardAvoidingView>
   );
 }
@@ -1629,5 +1961,46 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     flexShrink: 0,
+  },
+  schemaSelector: {
+    backgroundColor: '#fff',
+    borderRadius: 10,
+    padding: 15,
+    marginBottom: 15,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  schemaLabel: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 10,
+  },
+  schemaButtons: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  schemaButton: {
+    flex: 1,
+    paddingVertical: 10,
+    paddingHorizontal: 15,
+    backgroundColor: '#f5f5f5',
+    borderRadius: 5,
+    alignItems: 'center',
+  },
+  schemaButtonSelected: {
+    backgroundColor: '#E3F2FD',
+    borderColor: '#0066CC',
+    borderWidth: 1,
+  },
+  schemaButtonText: {
+    fontSize: 14,
+    color: '#666',
+  },
+  schemaButtonTextSelected: {
+    color: '#0066CC',
+    fontWeight: 'bold',
   },
 });

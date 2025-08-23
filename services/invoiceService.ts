@@ -1,4 +1,4 @@
-import { api, InvoiceRequest, TicketRequest } from './api';
+import { api, InvoiceRequest, TicketRequest, EnhancedInvoiceRequest } from './api';
 import { Alert } from 'react-native';
 
 /**
@@ -359,3 +359,72 @@ export function formatTicketData(
   console.log('Final formatted ticket request:', JSON.stringify(ticketRequest, null, 2));
   return ticketRequest;
 }
+
+// NUEVA FUNCIÓN PARA ESQUEMA MEJORADO
+export const generateEnhancedInvoice = async (invoiceData: EnhancedInvoiceRequest): Promise<Document | null> => {
+  console.log('🚀 Beginning generateEnhancedInvoice with new schema');
+  console.log('📋 Validating enhanced invoice data');
+  
+  try {
+    // Validaciones básicas
+    if (!invoiceData.client || !invoiceData.client.name || !invoiceData.client.code) {
+      Alert.alert('Error', 'Datos del cliente incompletos');
+      return null;
+    }
+    
+    if (!invoiceData.details || invoiceData.details.length === 0) {
+      Alert.alert('Error', 'Debe incluir al menos un producto');
+      return null;
+    }
+    
+    if (invoiceData.netTotal <= 0) {
+      Alert.alert('Error', 'El monto neto debe ser mayor a 0');
+      return null;
+    }
+    
+    console.log('✅ Enhanced invoice data validation passed');
+    console.log('📊 Enhanced invoice data:', JSON.stringify(invoiceData, null, 2));
+    
+    // Llamar a la API con el nuevo esquema
+    const response = await api.createInvoice(invoiceData);
+    
+    if (response && response.success) {
+      console.log('✅ Enhanced invoice created successfully:', response);
+      return {
+        id: response.id,
+        type: 'invoice',
+        assignedFolio: response.assignedFolio,
+        externalFolio: invoiceData.externalFolio || null,
+        date: invoiceData.date,
+        state: ['active'],
+        client: {
+          id: invoiceData.client.id,
+          rut: invoiceData.client.code,
+          name: invoiceData.client.name,
+          email: invoiceData.client.email
+        },
+        total: invoiceData.netTotal + invoiceData.taxes + (invoiceData.otherTaxes || 0),
+        validation: response.validation,
+        details: invoiceData.details.map(detail => ({
+          position: 0,
+          product: {
+            code: detail.product.code,
+            name: detail.product.name,
+            price: detail.product.price,
+            unit: { code: detail.product.unit.code }
+          },
+          quantity: detail.quantity
+        }))
+      };
+    } else {
+      console.error('❌ Enhanced invoice creation failed:', response);
+      Alert.alert('Error', 'No se pudo generar la factura con el esquema mejorado');
+      return null;
+    }
+    
+  } catch (error) {
+    console.error('❌ Error in generateEnhancedInvoice:', error);
+    Alert.alert('Error', 'Error al generar la factura con el esquema mejorado');
+    return null;
+  }
+};

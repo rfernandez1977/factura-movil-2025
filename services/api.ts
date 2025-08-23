@@ -133,6 +133,24 @@ interface Activity {
   name: string;
 }
 
+interface Municipality {
+  id: number;
+  code: string;
+  name: string;
+}
+
+interface Activity {
+  id: number;
+  code: string;
+  name: string;
+}
+
+interface Address {
+  id: number;
+  address: string;
+  municipality?: Municipality;
+}
+
 export interface Client {
   id: number;
   code: string;
@@ -143,10 +161,11 @@ export interface Client {
   municipality?: Municipality;
   activity?: Activity;
   line?: string;
+  additionalAddress?: Address[];
 }
 
 interface Unit {
-  id?: number;
+  id: number;
   code: string;
   name: string;
 }
@@ -196,20 +215,98 @@ interface ProductDetail {
   description?: string;
 }
 
+export interface InvoiceClient {
+  code: string;
+  name: string;
+  address?: string;
+  municipality?: string;
+  line?: string;
+}
+
+export interface InvoiceProductDetail {
+  position: number;
+  product: {
+    code: string;
+    name: string;
+    price: number;
+    unit?: {
+      code: string;
+    };
+    category?: {
+      id: number;
+      code: string;
+      name: string;
+    };
+  };
+  quantity: number;
+}
+
 export interface InvoiceRequest {
   currency: string;
   hasTaxes: boolean;
-  client: {
-    code: string;
-    name: string;
-    address?: string;
-    municipality?: string;
-    line?: string;
-  };
+  client: InvoiceClient;
   date: string;
-  details: ProductDetail[];
+  details: InvoiceProductDetail[];
   paymentMethod?: string;
   paymentCondition?: string;
+  externalFolio?: string;
+}
+
+// NUEVO ESQUEMA MEJORADO CON IMPUESTOS ADICIONALES
+export interface EnhancedInvoiceClient {
+  id: number;
+  code: string;
+  name: string;
+  address?: string;
+  email?: string;
+  municipality?: {
+    id: number;
+    name: string;
+    code: string;
+  };
+  line?: string;
+  additionalAddress?: Address[];
+}
+
+export interface EnhancedInvoiceProduct {
+  id: number;
+  code: string;
+  name: string;
+  price: number;
+  unit: {
+    id: number;
+    name: string;
+    code: string;
+  };
+  category: {
+    id: number;
+    code: string;
+    name: string;
+    otherTax?: {
+      id: number;
+      code: string;
+      name: string;
+      percent: number;
+    };
+  };
+}
+
+export interface EnhancedInvoiceDetail {
+  product: EnhancedInvoiceProduct;
+  quantity: number;
+}
+
+export interface EnhancedInvoiceRequest {
+  hasTaxes: boolean;
+  externalFolio?: string;
+  client: EnhancedInvoiceClient;
+  details: EnhancedInvoiceDetail[];
+  netTotal: number;
+  discounts?: number;
+  date: string;
+  exemptTotal?: number;
+  otherTaxes?: number;
+  taxes: number;
 }
 
 export interface TicketRequest {

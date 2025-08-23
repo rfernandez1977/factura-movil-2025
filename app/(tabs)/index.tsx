@@ -72,7 +72,7 @@ function HomeScreen() {
   const actions = React.useMemo(() => [
     {
       title: "VozPos",
-      description: "Emitir documentos por voz",
+      description: "Próximamente - Emitir documentos por voz",
       icon: <Mic size={32} color="#FFFFFF" />,
       bgColor: "#2D3748",
       route: "/sales/vozpos"
@@ -85,11 +85,11 @@ function HomeScreen() {
       route: "/quick"
     },
     {
-      title: "VisionPos",
-      description: "Escanear documentos físicos",
+      title: "ViewPos",
+      description: "Próximamente - Captura de productos con IA",
       icon: <Camera size={32} color="#4CAF50" />,
       bgColor: "#E8F5E9",
-      route: "/sales/new-vision"
+      route: "/sales/viewpos"
     },
     {
       title: "TouchPos",

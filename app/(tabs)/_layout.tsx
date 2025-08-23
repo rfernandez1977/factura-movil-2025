@@ -1,7 +1,7 @@
 import React, { lazy, Suspense } from 'react';
 import { Tabs } from 'expo-router';
 import { ActivityIndicator, View } from 'react-native';
-import { Chrome as Home, Users, Package, Settings } from 'lucide-react-native';
+import { Chrome as Home, Users, Package, Settings, ShoppingCart } from 'lucide-react-native';
 
 // Lazy icon loading fallback
 const IconFallback = () => (
@@ -30,6 +30,17 @@ export default function TabLayout() {
           tabBarIcon: ({ size, color }) => (
             <Suspense fallback={<IconFallback />}>
               <Home size={size} color={color} />
+            </Suspense>
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="sales/index"
+        options={{
+          title: 'Ventas',
+          tabBarIcon: ({ size, color }) => (
+            <Suspense fallback={<IconFallback />}>
+              <ShoppingCart size={size} color={color} />
             </Suspense>
           ),
         }}

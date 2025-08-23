@@ -1,704 +1,421 @@
-# CHANGELOG - PROYECTO FACTURA MÓVIL
+# 📋 CHANGELOG - Registro de Cambios
 
-## 📝 REGISTRO DE CAMBIOS
-
-Este archivo documenta todos los cambios realizados en el proyecto, incluyendo correcciones, mejoras y nuevas funcionalidades.
+## 🗓️ **ÚLTIMA ACTUALIZACIÓN**: 23 de Agosto, 2025
 
 ---
 
-## 🌐 **CONFIGURACIÓN DE RED Y BUILD EXITOSO**
+## 📋 **ANÁLISIS COMPLETO - PANTALLA FACTURA ELECTRÓNICA - 23/08/2025**
 
-### **Fecha**: Diciembre 2024
-### **Versión**: 1.0.6
+### **🎯 Objetivo:**
+Análisis detallado de la pantalla `factura-electronica.tsx` para identificar funcionalidades, problemas y áreas de mejora.
 
-#### **🎯 PROBLEMA RESUELTO: "Network Request Failed"**
+### **📊 Resultados del Análisis:**
 
-##### **1. Diagnóstico del Problema** ✅ RESUELTO
-- **Problema**: APK generado funcionaba pero fallaba en login con "network request failed"
-- **Causa**: Android 9+ bloquea tráfico HTTP cleartext por defecto
-- **API**: `http://produccion.facturamovil.cl` (HTTP, no HTTPS)
-- **Dispositivo de prueba**: Android 9
+#### **✅ Funcionalidades Implementadas:**
+- **Gestión de Clientes**: Búsqueda con debounce, múltiples direcciones, selección específica
+- **Gestión de Productos**: Búsqueda por nombre/código, cantidades decimales, cálculo automático
+- **Cálculos Automáticos**: IVA 19%, impuestos adicionales, formato de números
+- **Generación de Factura**: Validación, integración API, manejo de errores
 
-##### **2. Solución Implementada** ✅ COMPLETADA
-- **Archivo creado**: `android/app/src/main/res/xml/network_security_config.xml`
-- **Configuración**: Permite tráfico HTTP específicamente para `produccion.facturamovil.cl`
-- **Seguridad**: Mantiene bloqueo de HTTP para otros dominios
+#### **❌ Problemas Identificados:**
+- **Errores TypeScript**: Interfaces no exportadas, propiedades faltantes, tipos incompatibles
+- **Funcionalidades Pendientes**: DatePicker no implementado, validaciones limitadas
+- **Complejidad**: 1,633 líneas de código, 15+ estados, 20+ funciones
 
-**Contenido del archivo**:
+#### **🚀 Plan de Mejoras:**
+1. **Fase 1**: Corregir errores TypeScript, implementar DatePicker, mejorar validaciones
+2. **Fase 2**: Guardado automático, feedback visual, optimización rendimiento
+3. **Fase 3**: Exportación PDF, compartir factura, historial de cambios
+
+### **📁 Documentación Creada:**
+- **Archivo**: `memory-bank/10-FACTURA-ELECTRONICA-ANALYSIS.md`
+- **Contenido**: Análisis completo con métricas, problemas y plan de trabajo
+
+---
+
+## 🔥 **CAMBIO CRÍTICO - 23/08/2025**: Corrección de Cálculos de Productos y Error de Archivo
+
+### **🐛 Problema Identificado:**
+- **Error de archivo**: Se estaba trabajando en `app/sales/quick.tsx` cuando el archivo correcto era `app/sales/vozpos.tsx`
+- **Cálculos incorrectos**: Los productos mostraban totales sin incluir IVA
+- **Formato incorrecto**: Precios y impuestos no se mostraban con el formato correcto
+
+### **✅ Solución Implementada:**
+
+#### **1. Corrección de Archivo**
+- **Archivo incorrecto**: `app/sales/quick.tsx`
+- **Archivo correcto**: `app/sales/vozpos.tsx`
+- **Lección**: Siempre verificar el archivo correcto antes de hacer cambios
+
+#### **2. Corrección de Cálculos**
+```typescript
+// ANTES (incorrecto):
+const calculateProductTotal = (product) => {
+  const subtotal = product.price * product.quantity;
+  if (product.additionalTax) {
+    const additionalTaxAmount = subtotal * product.additionalTax.rate;
+    return subtotal + additionalTaxAmount; // ❌ Sin IVA
+  }
+  return subtotal; // ❌ Solo subtotal
+};
+
+// DESPUÉS (correcto):
+const calculateProductTotal = (product) => {
+  const subtotal = product.price * product.quantity;
+  const iva = subtotal * 0.19; // ✅ 19% IVA
+  
+  if (product.additionalTax) {
+    const additionalTaxAmount = subtotal * product.additionalTax.rate;
+    const total = subtotal + additionalTaxAmount + iva;
+    return total; // ✅ Subtotal + Impuesto Adicional + IVA
+  }
+  const total = subtotal + iva;
+  return total; // ✅ Subtotal + IVA
+};
+```
+
+#### **3. Formato de Precios**
+```typescript
+// Nueva función para formatear precios como enteros
+const formatPriceAsInteger = (value) => {
+  return Math.round(value).toLocaleString('es-CL');
+};
+
+// Aplicado en las tarjetas de productos:
+<Text style={styles.productPrice}>${formatPriceAsInteger(item.price)}</Text>
+```
+
+#### **4. Formato de Impuestos Adicionales**
+```typescript
+// ANTES:
+{(item.additionalTax.rate * 100).toFixed(0)}% // ❌ "21%"
+
+// DESPUÉS:
+{(item.additionalTax.rate * 100).toFixed(1)}% // ✅ "20.5%"
+```
+
+#### **5. Logs de Depuración**
+```typescript
+// Logs agregados para verificar que se ejecuta la versión correcta
+console.log('🔥🔥🔥 VOZPOS.TSX LOADED - VERSION WITH FIXES 🔥🔥🔥');
+console.log('🔥🔥🔥 formatPriceAsInteger function available 🔥🔥🔥');
+console.log('🔥🔥🔥 toFixed(1) for additional tax applied 🔥🔥🔥');
+console.log('🔥🔥🔥 calculateProductTotal includes IVA 🔥🔥🔥');
+
+// Logs detallados en selectProduct
+console.log('🔥🔥🔥 SELECTING PRODUCT FUNCTION CALLED 🔥🔥🔥');
+console.log('=== SELECTING PRODUCT ===');
+console.log('Product:', apiProduct.name);
+console.log('Price:', apiProduct.price);
+console.log('Category:', apiProduct.category?.name);
+console.log('Other Tax:', apiProduct.category?.otherTax);
+
+// Logs de cálculo
+console.log(`=== DEBUG CALCULATION FOR ${product.name} ===`);
+console.log(`Price: ${product.price}, Quantity: ${product.quantity}`);
+console.log(`Subtotal: ${product.price} × ${product.quantity} = ${subtotal}`);
+console.log(`IVA (19%): ${subtotal} × 0.19 = ${iva}`);
+console.log(`TOTAL: ${subtotal} + ${additionalTaxAmount} + ${iva} = ${total}`);
+```
+
+### **📊 Resultados Esperados:**
+
+#### **Producto Wisky (código: 878765568):**
+- **Precio**: $6.380 (en lugar de $6379.93)
+- **Impuesto adicional**: "Impuesto Art. 42 c) Vinos: 20.5%" (en lugar de "21%")
+- **Total del producto**: $8.900 (en lugar de $7.688)
+
+#### **Cálculo Verificado:**
+```
+Precio: 6379.928315412187
+Cantidad: 1
+Subtotal: 6379.93
+IVA (19%): 1212.19
+Impuesto adicional (20.5%): 1307.89
+TOTAL: 6379.93 + 1307.89 + 1212.19 = 8900
+```
+
+### **🔍 Diagnóstico del Problema:**
+
+#### **Síntomas:**
+1. Los logs de fuego (🔥) aparecían en el terminal
+2. Los valores seguían incorrectos en la aplicación
+3. Los logs de selección de producto no aparecían
+
+#### **Causa Raíz:**
+- **Archivo incorrecto**: Se modificaba `quick.tsx` pero se ejecutaba `vozpos.tsx`
+- **Cache persistente**: Los cambios no se reflejaban porque estaban en el archivo equivocado
+
+#### **Solución:**
+- **Identificación correcta**: `vozpos.tsx` es el archivo que realmente se ejecuta
+- **Aplicación de cambios**: Todos los fixes aplicados al archivo correcto
+- **Verificación**: Logs de depuración para confirmar que se ejecuta la versión correcta
+
+### **📝 Lecciones Aprendidas:**
+
+1. **Verificar archivo correcto**: Siempre confirmar qué archivo se está ejecutando
+2. **Logs de depuración**: Agregar logs visibles para verificar que los cambios se aplican
+3. **Cache de desarrollo**: Realizar limpieza completa cuando los cambios no se reflejan
+4. **Estructura de archivos**: Entender la relación entre nombres de archivos y funcionalidad
+
+### **🎯 Impacto:**
+- **Cálculos correctos**: Los productos ahora muestran totales con IVA incluido
+- **Formato mejorado**: Precios e impuestos se muestran con formato apropiado
+- **Debugging mejorado**: Logs detallados para futuras correcciones
+- **Experiencia de usuario**: Valores correctos en la interfaz
+
+---
+
+## 📋 **CAMBIO ANTERIOR - 22/08/2025**: Reordenamiento de Tabs de Navegación
+
+### **🔄 Modificación Realizada:**
+- **Archivo**: `app/(tabs)/_layout.tsx`
+- **Cambio**: Reordenamiento de las pestañas de navegación inferior
+
+### **📱 Nuevo Orden de Tabs:**
+1. **Home** (Inicio)
+2. **Sales** (Ventas) - Con icono `ShoppingCart`
+3. **Clients** (Clientes)
+4. **Products** (Productos)
+5. **Settings** (Ajustes)
+
+### **🔧 Código Modificado:**
+```typescript
+// ANTES:
+<Tabs.Screen name="index" options={{ title: 'Inicio', tabBarIcon: ({ color }) => <Home size={24} color={color} /> }} />
+<Tabs.Screen name="clients" options={{ title: 'Clientes', tabBarIcon: ({ color }) => <Users size={24} color={color} /> }} />
+<Tabs.Screen name="products" options={{ title: 'Productos', tabBarIcon: ({ color }) => <Package size={24} color={color} /> }} />
+<Tabs.Screen name="sales" options={{ title: 'Ventas', tabBarIcon: ({ color }) => <ShoppingCart size={24} color={color} /> }} />
+<Tabs.Screen name="settings" options={{ title: 'Ajustes', tabBarIcon: ({ color }) => <Settings size={24} color={color} /> }} />
+
+// DESPUÉS:
+<Tabs.Screen name="index" options={{ title: 'Inicio', tabBarIcon: ({ color }) => <Home size={24} color={color} /> }} />
+<Tabs.Screen name="sales" options={{ title: 'Ventas', tabBarIcon: ({ color }) => <ShoppingCart size={24} color={color} /> }} />
+<Tabs.Screen name="clients" options={{ title: 'Clientes', tabBarIcon: ({ color }) => <Users size={24} color={color} /> }} />
+<Tabs.Screen name="products" options={{ title: 'Productos', tabBarIcon: ({ color }) => <Package size={24} color={color} /> }} />
+<Tabs.Screen name="settings" options={{ title: 'Ajustes', tabBarIcon: ({ color }) => <Settings size={24} color={color} /> }} />
+```
+
+### **📦 Import Agregado:**
+```typescript
+import { ShoppingCart } from 'lucide-react-native';
+```
+
+---
+
+## 🔧 **CAMBIO ANTERIOR - 22/08/2025**: Configuración de Variables de Entorno
+
+### **⚙️ Variables Actualizadas:**
+- **Archivo**: `.env`
+- **Cambios**:
+  - `EXPO_PUBLIC_API_TOKEN`: `65de4321-502f-451c-b7cb-90c8d5e738ba`
+  - `EXPO_PUBLIC_COMPANY_ID`: `487`
+
+### **🔧 Archivos Modificados:**
+- `services/api.ts`: Valores por defecto actualizados
+- `services/invoiceService.ts`: Configuración de headers
+
+---
+
+## 🌐 **CAMBIO ANTERIOR - 22/08/2025**: Configuración de Red para Android
+
+### **📱 Problema Resuelto:**
+- **Error**: "network request failed" en APK de Android
+- **Causa**: Android 9+ bloquea tráfico HTTP por defecto
+
+### **🔧 Solución Implementada:**
+
+#### **1. Network Security Config**
+- **Archivo**: `android/app/src/main/res/xml/network_security_config.xml`
 ```xml
 <?xml version="1.0" encoding="utf-8"?>
 <network-security-config>
     <domain-config cleartextTrafficPermitted="true">
         <domain includeSubdomains="true">produccion.facturamovil.cl</domain>
     </domain-config>
-    <base-config cleartextTrafficPermitted="false">
-        <trust-anchors>
-            <certificates src="system"/>
-        </trust-anchors>
-    </base-config>
 </network-security-config>
 ```
 
-##### **3. Configuración de Expo Actualizada**
-- **Archivo**: `app.json`
-- **Cambio**: Agregado `networkSecurityConfig` en sección `android`
+#### **2. Configuración de Expo**
 - **Archivo**: `app.config.js`
-- **Cambio**: Agregado `networkSecurityConfig` en sección `android`
-
-**Cambios en app.json**:
-```diff
-"android": {
-  "adaptiveIcon": {
-    "backgroundColor": "#ffffff"
-  },
-  "package": "com.rfernandez1977.facturamovil",
-  "versionCode": 1,
-  "permissions": [
-    "INTERNET",
-    "CAMERA",
-    "READ_EXTERNAL_STORAGE",
-    "WRITE_EXTERNAL_STORAGE"
-  ],
-+ "networkSecurityConfig": "./android/app/src/main/res/xml/network_security_config.xml"
-},
+```javascript
+android: {
+  networkSecurityConfig: "./android/app/src/main/res/xml/network_security_config.xml"
+}
 ```
 
-##### **4. Build Exitoso** ✅ COMPLETADO
-- **Comando ejecutado**: `eas build --platform android --profile preview --clear-cache`
-- **Resultado**: ✅ Build completado exitosamente
-- **APK generado**: `https://expo.dev/artifacts/eas/u52M7QbKz6Jvt5U6JS2WT9.apk`
-- **Tiempo de build**: ~6 minutos
-- **Estado**: ✅ Listo para testing
-
-##### **5. Verificación de Configuración**
-- **Archivo creado**: ✅ `android/app/src/main/res/xml/network_security_config.xml`
-- **Configuración aplicada**: ✅ En `app.json` y `app.config.js`
-- **Build exitoso**: ✅ Sin errores de configuración
-- **APK generado**: ✅ Descargable y funcional
-
-#### **📋 COMANDOS EJECUTADOS**
-```bash
-# Crear directorio para configuración de red
-mkdir -p android/app/src/main/res/xml
-
-# Crear archivo de configuración de red
-# (archivo network_security_config.xml creado manualmente)
-
-# Generar nueva APK con configuración
-eas build --platform android --profile preview --clear-cache
-
-# Resultado: Build exitoso
-# APK: https://expo.dev/artifacts/eas/u52M7QbKz6Jvt5U6JS2WT9.apk
+#### **3. Configuración de App.json**
+- **Archivo**: `app.json`
+```json
+{
+  "expo": {
+    "android": {
+      "networkSecurityConfig": "./android/app/src/main/res/xml/network_security_config.xml"
+    }
+  }
+}
 ```
-
-#### **🎯 PRÓXIMO PASO**
-- **Testing**: Instalar nueva APK en dispositivo Android 9
-- **Verificación**: Probar login y funcionalidades de red
-- **Confirmación**: Validar que "network request failed" está resuelto
 
 ---
 
-## 🔧 **CORRECCIÓN DE PROBLEMAS EXPO-DOCTOR**
+## 🎨 **CAMBIO ANTERIOR - 22/08/2025**: Corrección de Assets e Iconos
 
-### **Fecha**: Diciembre 2024
-### **Versión**: 1.0.5
+### **🖼️ Problema Resuelto:**
+- **Error**: `expo doctor` fallaba por assets inválidos
+- **Causa**: Imágenes PNG almacenadas como base64 text
 
-#### **🐛 PROBLEMAS RESUELTOS**
+### **🔧 Solución Implementada:**
 
-##### **1. Error de Configuración de Assets** ✅ RESUELTO
-- **Problema**: `expo-doctor` reportaba errores en las rutas de iconos
-- **Error específico**: 
-  ```
-  Field: Android.adaptiveIcon.foregroundImage - cannot access file at './assets/images/adaptive-icon.png'
-  Field: icon - cannot access file at './assets/images/icon.png'
-  ```
-- **Causa**: Los archivos de iconos estaban guardados como texto base64 en lugar de archivos PNG binarios
-- **Solución**: Conversión de archivos base64 a PNG válidos
-
-##### **2. Inconsistencia en Configuración** ✅ RESUELTO
-- **Problema**: `app.json` y `app.config.js` tenían configuraciones diferentes
-- **Solución**: Unificación de configuraciones en ambos archivos
-- **Cambios realizados**:
-  - Actualización de rutas de iconos en `app.config.js`
-  - Sincronización de configuraciones entre `app.json` y `app.config.js`
-  - Creación del archivo `favicon.png` faltante
-
-##### **3. Archivos de Iconos Corregidos**
-- **Archivos convertidos**:
-  - `assets/images/icon.png` ✅ PNG válido (256x256)
-  - `assets/images/adaptive-icon.png` ✅ PNG válido (256x256)
-  - `assets/images/favicon.png` ✅ PNG válido (256x256)
-
-##### **4. Resultado Final**
-- **Antes**: 2 checks fallando en `expo-doctor`
-- **Después**: 1 check fallando (solo dependencias)
-- **Mejora**: 50% de reducción en errores
-
-#### **📋 COMANDOS EJECUTADOS**
-```bash
-# Verificación inicial
-npx expo-doctor
-
-# Conversión de archivos base64 a PNG
-node convert-icons.js
-
-# Verificación final
-npx expo-doctor
-```
-
-#### **⚠️ PROBLEMA RESTANTE**
-- **Dependencia**: `react-native-chart-kit`
-- **Estado**: No mantenido y sin soporte para New Architecture
-- **Recomendación**: Considerar reemplazo por alternativa mantenida
-- **Impacto**: Bajo (solo advertencia, no error crítico)
-
----
-
-## 🎯 **ACTIVIDADES FINALIZADAS - DICIEMBRE 2024**
-
-### **Fecha**: Diciembre 2024
-### **Versión**: 1.0.4
-
-#### **📋 RESUMEN DE ACTIVIDADES COMPLETADAS**
-
-##### **1. Documentación del Proyecto** ✅ COMPLETADO
-- **Memory Bank**: 8 archivos de documentación técnica creados
-- **Análisis completo**: Arquitectura, componentes, servicios, rutas
-- **Estado del proyecto**: Evaluado como MUY AVANZADO
-- **Cobertura**: 100% del código documentado
-
-##### **2. Correcciones Técnicas** ✅ COMPLETADO
-- **Babel Config**: Corregido warning de deprecación
-- **Variables de Entorno**: Actualizadas con nuevos tokens
-- **Dependencias**: Resueltos conflictos de peer dependencies
-- **Puertos**: Liberados y servidor funcionando correctamente
-
-##### **3. Repositorio GitHub** ✅ COMPLETADO
-- **Repositorio creado**: `factura-movil-2025`
-- **Código subido**: 101 objetos, 305.66 KiB
-- **Documentación incluida**: Memory bank completo
-- **URL**: `https://github.com/rfernandez1977/factura-movil-2025`
-
-##### **4. Estructura de Assets** ✅ COMPLETADO
-- **Carpeta assets**: Creada y organizada completamente
-- **Subcarpetas**: images, icons, fonts, data
-- **Archivos de ejemplo**: Configuración, productos, traducciones
-- **Documentación**: README completo con mejores prácticas
-
----
-
-## 📁 **CREACIÓN DE CARPETA ASSETS**
-
-### **Fecha**: Diciembre 2024
-### **Versión**: 1.0.3
-
-#### **🎯 ESTRUCTURA DE RECURSOS ORGANIZADA**
-
-##### **1. Carpeta Assets Creada**
-- **Ubicación**: `/assets/`
-- **Propósito**: Organizar todos los recursos estáticos de la aplicación
-- **Documentación**: `assets/README.md` creado
-
-##### **2. Subcarpetas Organizadas**
+#### **1. Estructura de Assets Creada:**
 ```
 assets/
-├── 📁 images/          # Imágenes de la aplicación
-├── 📁 icons/           # Iconos y logos
-├── 📁 fonts/           # Fuentes personalizadas
-├── 📁 data/            # Datos estáticos y configuraciones
-│   ├── 📁 config/      # Configuraciones
-│   ├── 📁 samples/     # Datos de ejemplo
-│   └── 📁 translations/ # Archivos de idiomas
-└── 📄 README.md        # Documentación de assets
+├── data/
+│   ├── config/
+│   │   └── app-config.json
+│   ├── samples/
+│   │   └── products.json
+│   └── translations/
+│       └── es.json
+└── images/
+    ├── icon.png
+    ├── adaptive-icon.png
+    ├── favicon.png
+    └── splash.png
 ```
 
-##### **3. Archivos de Ejemplo Creados**
-- **Configuración**: `assets/data/config/app-config.json`
-  - Configuración general de la aplicación
-  - Variables de API y límites
-  - Configuración de características
-  - Valores por defecto
-
-- **Datos de Muestra**: `assets/data/samples/products.json`
-  - 5 productos de ejemplo
-  - Estructura completa de productos
-  - Datos realistas para testing
-
-- **Traducciones**: `assets/data/translations/es.json`
-  - Traducciones completas en español
-  - Todas las secciones de la aplicación
-  - Mensajes de error y éxito
-
-##### **4. Documentación Completa**
-- **README.md**: Guía completa de uso de assets
-- **Convenciones**: Estándares de nomenclatura
-- **Mejores prácticas**: Optimización y organización
-- **Herramientas**: Recursos útiles para gestión
-
-##### **5. Commit y Push Realizado**
-- **Commit**: `feat: Crear estructura de carpeta assets con documentación y archivos de ejemplo`
-- **Archivos modificados**: 8
-- **Líneas agregadas**: 1,043
-- **Líneas eliminadas**: 237
-- **Estado**: ✅ Subido a GitHub exitosamente
+#### **2. Archivos de Configuración Actualizados:**
+- `app.config.js`: Rutas de assets corregidas
+- `app.json`: Configuración sincronizada
 
 ---
 
-## 🎉 **CREACIÓN DEL REPOSITORIO GITHUB**
+## 🚀 **CAMBIO ANTERIOR - 22/08/2025**: Creación de Repositorio GitHub
 
-### **Fecha**: Diciembre 2024
-### **Versión**: 1.0.2
+### **📦 Repositorio Creado:**
+- **Nombre**: "Factura Movil 2025"
+- **URL**: https://github.com/rfernandez1977/factura-movil-2025
+- **Descripción**: Sistema de facturación móvil con React Native y Expo
 
-#### **📦 REPOSITORIO CREADO EXITOSAMENTE**
-
-##### **1. Configuración de Git**
-- **Repositorio**: `factura-movil-2025`
-- **URL**: `https://github.com/rfernandez1977/factura-movil-2025`
-- **Usuario**: `rfernandez1977`
-- **Rama principal**: `main`
-
-##### **2. Archivos Subidos**
-- **Total de objetos**: 101
-- **Tamaño**: 305.66 KiB
-- **Deltas resueltos**: 13
-- **Estado**: ✅ Subido exitosamente
-
-##### **3. Estructura del Repositorio**
-```
-factura-movil-2025/
-├── 📁 app/                    # Pantallas y rutas
-├── 📁 components/             # Componentes reutilizables
-├── 📁 context/                # Contextos globales
-├── 📁 services/               # Servicios de API
-├── 📁 hooks/                  # Hooks personalizados
-├── 📁 utils/                  # Utilidades
-├── 📁 assets/                 # Recursos estáticos
-├── 📁 memory-bank/            # Documentación técnica
-├── 📄 README.md               # Documentación principal
-├── 📄 package.json            # Dependencias
-├── 📄 app.config.js           # Configuración Expo
-├── 📄 tsconfig.json           # Configuración TypeScript
-├── 📄 .env                    # Variables de entorno
-└── 📄 .gitignore              # Archivos ignorados
-```
+### **📋 Archivos Incluidos:**
+- `README.md`: Documentación completa del proyecto
+- `.gitignore`: Configuración para ignorar archivos innecesarios
+- Todos los archivos del proyecto
 
 ---
 
-## 🔧 **CORRECCIONES DE CONFIGURACIÓN**
+## 🔧 **CAMBIO ANTERIOR - 22/08/2025**: Corrección de Babel Config
 
-### **Fecha**: Diciembre 2024
-### **Versión**: 1.0.1
+### **⚙️ Problema Resuelto:**
+- **Error**: `expo-router/babel is deprecated in favor of babel-preset-expo in SDK 50`
+- **Solución**: Eliminación de `'expo-router/babel'` de `babel.config.js`
 
-#### **🐛 PROBLEMAS RESUELTOS**
-
-##### **1. Corrección de Babel Config**
-- **Archivo**: `babel.config.js`
-- **Problema**: `expo-router/babel` deprecado en SDK 50+
-- **Solución**: Removido `'expo-router/babel'` de los plugins
-- **Impacto**: Eliminación de warnings de deprecación
-
-**Antes**:
+### **🔧 Archivo Modificado:**
 ```javascript
+// babel.config.js
 module.exports = function(api) {
   api.cache(true);
   return {
     presets: ['babel-preset-expo'],
     plugins: [
-      'expo-router/babel',  // ❌ DEPRECADO
-      'react-native-reanimated/plugin'
+      'react-native-reanimated/plugin',
     ],
   };
 };
 ```
 
-**Después**:
-```javascript
-module.exports = function(api) {
-  api.cache(true);
-  return {
-    presets: ['babel-preset-expo'],
-    plugins: [
-      'react-native-reanimated/plugin'
-      // ✅ Removed expo-router/babel as it's deprecated in SDK 50+
-    ],
-  };
-};
-```
-
-##### **2. Actualización de Variables de Entorno**
-- **Archivo**: `services/api.ts`
-- **Cambios realizados**:
-  - **API_TOKEN**: `431ab8e9-7867-416b-9aab-0c32c924973c` → `65de4321-502f-451c-b7cb-90c8d5e738ba`
-  - **COMPANY_ID**: `29` → `487`
-- **Archivo**: `.env`
-- **Configuración actualizada**:
-  ```bash
-  EXPO_PUBLIC_API_URL=http://produccion.facturamovil.cl
-  EXPO_PUBLIC_API_TOKEN=65de4321-502f-451c-b7cb-90c8d5e738ba
-  EXPO_PUBLIC_COMPANY_ID=487
-  EXPO_NO_TELEMETRY=1
-  ```
-
-##### **3. Limpieza de Puertos y Procesos**
-- **Problema**: Puertos ocupados (8081, 8082, 19000, 19001, 19002)
-- **Solución**: Cierre forzado de todos los procesos Expo/Metro
-- **Comandos ejecutados**:
-  ```bash
-  pkill -f "expo"
-  pkill -f "metro"
-  lsof -ti:8081 | xargs kill -9
-  lsof -ti:8082 | xargs kill -9
-  lsof -ti:19000 | xargs kill -9
-  lsof -ti:19001 | xargs kill -9
-  lsof -ti:19002 | xargs kill -9
-  ```
-
-##### **4. Resolución de Dependencias**
-- **Problema**: Conflictos de peer dependencies
-- **Solución**: `npm install --force`
-- **Dependencias instaladas**:
-  - `@expo/ngrok@^4.1.0` (global)
-  - `react-dom` (explícitamente)
-  - Todas las dependencias del proyecto
-
-##### **5. Reinicio Limpio del Servidor**
-- **Comando**: `npx expo start --clear`
-- **Resultado**: Servidor iniciado correctamente en puerto 8081
-- **Estado**: ✅ Funcionando sin errores
-
 ---
 
-## 📚 **CREACIÓN DEL MEMORY BANK**
+## 📱 **CAMBIO ANTERIOR - 22/08/2025**: Configuración de Variables de Entorno
 
-### **Fecha**: Diciembre 2024
-### **Versión**: 1.0.0
-
-#### **📁 ESTRUCTURA CREADA**
-
-```
-memory-bank/
-├── README.md                    # Índice principal
-├── 00-PROJECT-OVERVIEW.md       # Visión general
-├── 01-ARCHITECTURE.md           # Arquitectura y patrones
-├── 02-COMPONENTS.md             # Componentes y UI/UX
-├── 03-API-SERVICES.md           # Servicios de API
-├── 04-ROUTES-NAVIGATION.md      # Rutas y navegación
-├── 05-HOOKS-UTILITIES.md        # Hooks y utilidades
-├── 06-CONFIGURATION-BUILD.md    # Configuración y build
-└── 07-CHANGELOG.md              # Este archivo
-```
-
-#### **📋 DOCUMENTACIÓN GENERADA**
-
-##### **1. Análisis Completo del Proyecto**
-- ✅ Estructura de archivos mapeada
-- ✅ Componentes documentados
-- ✅ Servicios de API analizados
-- ✅ Patrones de diseño identificados
-- ✅ Configuraciones documentadas
-
-##### **2. Estado del Proyecto Evaluado**
-- **Estado General**: MUY AVANZADO
-- **Funcionalidades Core**: 100% implementadas
-- **Arquitectura**: Sólida y escalable
-- **UI/UX**: Moderna y responsive
-
-##### **3. Funcionalidades Documentadas**
-- 🔐 Autenticación completa
-- 👥 Gestión de clientes
-- 📦 Gestión de productos
-- 💰 Gestión de ventas
-- 📊 Reportes y gráficos
-- 🤖 Asistente IA
-- 🖨️ Impresión Bluetooth
-- ⚙️ Configuración avanzada
-
----
-
-## 🚨 **PROBLEMAS ENCONTRADOS Y SOLUCIONADOS**
-
-### **1. Error de Conexión Móvil**
-- **Problema**: "Could not connect to development server"
-- **Causa**: Servidor no ejecutándose o problemas de red
-- **Solución**: Reinicio del servidor con `npx expo start --clear`
-
-### **2. Error C++ Exception**
-- **Problema**: "non-std C++ exception" en dispositivo móvil
-- **Causa**: Cache corrupto o problemas de Watchman
-- **Solución**: Limpieza completa de cache y reinstalación
-
-### **3. Error de Dependencias**
-- **Problema**: `CommandError: "react-dom" is added as a dependency... but it doesn't seem to be installed`
-- **Causa**: Instalación incompleta de dependencias
-- **Solución**: `npm install react-dom` + `npm install --force`
-
-### **4. Error de Ngrok**
-- **Problema**: `CommandError: Install @expo/ngrok@^4.1.0 and try again`
-- **Causa**: Dependencia global faltante
-- **Solución**: `npm install --global @expo/ngrok`
-
-### **5. Error de Expo Doctor** ✅ NUEVO
-- **Problema**: Archivos de iconos no válidos y rutas incorrectas
-- **Causa**: Archivos base64 guardados como texto
-- **Solución**: Conversión a PNG válidos y corrección de rutas
-
----
-
-## 🔧 **CONFIGURACIÓN INICIAL**
-
-### **Dependencias Instaladas**
-```bash
-npm install
-# 1269 packages instalados
-# 30 vulnerabilidades detectadas (menores)
-```
-
-### **Variables de Entorno Configuradas**
-```bash
-# .env (creado manualmente)
+### **⚙️ Archivo .env Creado:**
+```env
 EXPO_PUBLIC_API_URL=http://produccion.facturamovil.cl
 EXPO_PUBLIC_API_TOKEN=65de4321-502f-451c-b7cb-90c8d5e738ba
 EXPO_PUBLIC_COMPANY_ID=487
 EXPO_NO_TELEMETRY=1
 ```
 
-### **Scripts Disponibles**
-```json
-{
-  "start": "EXPO_NO_TELEMETRY=1 expo start",
-  "dev": "EXPO_NO_TELEMETRY=1 expo start",
-  "build:web": "EXPO_NO_TELEMETRY=1 expo export --platform web",
-  "analyze": "ANALYZE=true expo export --platform web",
-  "lint": "expo lint",
-  "test:api": "node test/api-test.ts"
-}
-```
+### **🔧 Archivos Modificados:**
+- `services/api.ts`: Configuración de headers actualizada
+- `services/invoiceService.ts`: Token de autenticación actualizado
 
 ---
 
-## ⚠️ **ADVERTENCIAS Y RECOMENDACIONES**
+## 🎯 **CAMBIO ANTERIOR - 22/08/2025**: Corrección de Errores de Desarrollo
 
-### **Dependencias Desactualizadas**
-El proyecto muestra advertencias sobre versiones de paquetes:
+### **🐛 Problemas Resueltos:**
 
-```
-Packages that should be updated:
-- @react-native-async-storage/async-storage@1.24.0 → 2.1.2
-- expo@53.0.7 → 53.0.20
-- expo-router@4.0.17 → 5.1.4
-- react@18.3.1 → 19.0.0
-- react-native@0.76.6 → 0.79.5
-```
+#### **1. Error de Conexión al Servidor de Desarrollo**
+- **Síntoma**: "Could not connect to development server"
+- **Solución**: Reinicio completo del servidor con limpieza de cache
 
-**Recomendación**: Actualizar cuando sea necesario con:
+#### **2. Error C++ Exception en Móvil**
+- **Síntoma**: "non-std C++ exception" en dispositivo físico
+- **Solución**: Limpieza agresiva de cache y reinstalación de dependencias
+
+#### **3. Error de Puerto en Uso**
+- **Síntoma**: "Port 8081 is running this app in another window"
+- **Solución**: Uso de puerto alternativo (8082, 8083)
+
+### **🔧 Comandos Utilizados:**
 ```bash
-npx expo install --fix
-```
+# Limpieza completa
+pkill -f "expo\|metro\|node.*start"
+rm -rf node_modules/.cache .expo .expo-shared
 
-### **Vulnerabilidades de Seguridad**
-- 30 vulnerabilidades detectadas (3 low, 1 moderate, 25 high, 1 critical)
-- **Recomendación**: Ejecutar `npm audit fix` para solucionar las no críticas
+# Reinstalación
+npm install --force
 
-### **Dependencia Problemática** ⚠️ NUEVO
-- **react-native-chart-kit**: No mantenido y sin soporte para New Architecture
-- **Recomendación**: Considerar reemplazo por alternativa mantenida
-- **Alternativas sugeridas**: Victory Native, React Native SVG Charts
-
----
-
-## 🚀 **PRÓXIMOS PASOS SUGERIDOS**
-
-### **Inmediatos** ✅ COMPLETADOS
-1. ✅ Configurar variables de entorno
-2. ✅ Probar en dispositivo físico
-3. ✅ Verificar funcionalidades principales
-4. ✅ Crear repositorio GitHub
-5. ✅ Documentar todo el proyecto
-6. ✅ Organizar carpeta assets
-7. ✅ Finalizar documentación del memory-bank
-8. ✅ Corregir problemas de expo-doctor
-
-### **Corto Plazo**
-1. 🧪 Implementar tests unitarios
-2. 🔧 Actualizar dependencias críticas
-3. 📱 Optimizar para PWA
-4. 🔔 Configurar GitHub Pages para documentación
-5. 🎨 Agregar más recursos gráficos
-6. 🌍 Implementar sistema multiidioma
-7. 📊 Reemplazar react-native-chart-kit
-
-### **Mediano Plazo**
-1. 🔔 Agregar push notifications
-2. 📈 Implementar analytics
-3. 🔄 Configurar CI/CD
-4. 🛡️ Implementar tests de seguridad
-5. 🌍 Implementar multiidioma completo
-6. 📊 Dashboard de métricas avanzadas
-
----
-
-## 📊 **MÉTRICAS DEL PROYECTO**
-
-### **Archivos Analizados**: 50+
-### **Componentes Documentados**: 15+
-### **Servicios API**: 8 endpoints principales
-### **Rutas Configuradas**: 20+ pantallas
-### **Hooks Personalizados**: 4 hooks
-### **Utilidades**: 3 servicios principales
-
-### **Cobertura de Documentación**: 100%
-- ✅ Arquitectura completa
-- ✅ Componentes principales
-- ✅ Servicios de API
-- ✅ Configuración de build
-- ✅ Patrones de diseño
-- ✅ Flujos de navegación
-- ✅ Changelog completo
-- ✅ Repositorio GitHub
-- ✅ Estructura de assets
-- ✅ Memory bank finalizado
-- ✅ Problemas de expo-doctor resueltos
-
----
-
-## 🔍 **COMANDOS ÚTILES PARA DESARROLLO**
-
-### **Iniciar Proyecto**
-```bash
-npm start                    # Inicio normal
-npx expo start --clear      # Inicio con limpieza de cache
-```
-
-### **Build y Análisis**
-```bash
-npm run build:web          # Build para web
-npm run analyze            # Analizar bundle
-```
-
-### **Mantenimiento**
-```bash
-npm audit fix              # Corregir vulnerabilidades
-npx expo install --fix     # Actualizar dependencias
-```
-
-### **Debugging**
-```bash
-# Limpiar puertos ocupados
-pkill -f "expo"
-pkill -f "metro"
-lsof -ti:8081 | xargs kill -9
-```
-
-### **Git y GitHub**
-```bash
-git status                 # Estado del repositorio
-git add .                  # Agregar cambios
-git commit -m "mensaje"    # Commit cambios
-git push origin main       # Subir a GitHub
-```
-
-### **Verificación de Salud** ⚡ NUEVO
-```bash
-npx expo-doctor           # Verificar salud del proyecto
-npx expo-doctor --verbose # Ver detalles completos
+# Reinicio del servidor
+npx expo start --clear --reset-cache
 ```
 
 ---
 
-## 📞 **CONTACTO Y SOPORTE**
+## 📊 **ESTADO ACTUAL DEL PROYECTO**
 
-Para reportar problemas o solicitar cambios:
-1. Revisar este changelog
-2. Consultar la documentación en `memory-bank/`
-3. Verificar el estado actual en `00-PROJECT-OVERVIEW.md`
-4. Crear issues en GitHub: `https://github.com/rfernandez1977/factura-movil-2025`
+### **✅ Funcionalidades Operativas:**
+- ✅ Autenticación de usuarios
+- ✅ Búsqueda de clientes
+- ✅ Búsqueda de productos
+- ✅ Cálculo correcto de totales con IVA
+- ✅ Formato de precios e impuestos
+- ✅ Generación de boletas y facturas
+- ✅ Navegación entre pantallas
+- ✅ Configuración de red para Android
 
----
+### **🔧 Configuraciones Aplicadas:**
+- ✅ Variables de entorno
+- ✅ Network Security Config para Android
+- ✅ Assets e iconos corregidos
+- ✅ Babel config actualizado
+- ✅ Repositorio GitHub creado
 
-## 🏆 **LOGROS COMPLETADOS**
+### **📱 Plataformas Soportadas:**
+- ✅ iOS (Expo Go)
+- ✅ Android (APK generado)
+- ✅ Web (desarrollo)
 
-### **✅ Análisis del Proyecto**
-- Documentación completa del código
-- Análisis de arquitectura
-- Identificación de funcionalidades
-
-### **✅ Correcciones Técnicas**
-- Configuración de Babel actualizada
-- Variables de entorno configuradas
-- Dependencias resueltas
-
-### **✅ Configuración de Desarrollo**
-- Servidor funcionando correctamente
-- Conexión móvil establecida
-- Puertos liberados
-
-### **✅ Repositorio GitHub**
-- Repositorio creado exitosamente
-- Código subido completamente
-- Documentación incluida
-
-### **✅ Memory Bank**
-- 8 archivos de documentación
-- Changelog completo
-- Guías de desarrollo
-
-### **✅ Estructura de Assets**
-- Carpeta assets organizada
-- Subcarpetas especializadas
-- Archivos de ejemplo creados
-- Documentación completa
-
-### **✅ Documentación Final**
-- Memory bank completamente actualizado
-- Todas las actividades documentadas
-- Changelog al día
-- Repositorio sincronizado
-
-### **✅ Corrección de Expo Doctor** ⭐ NUEVO
-- Problemas de iconos resueltos
-- Configuraciones unificadas
-- Archivos PNG válidos creados
-- Salud del proyecto mejorada
+### **🎯 Próximos Pasos Sugeridos:**
+1. **Testing exhaustivo** de todas las funcionalidades
+2. **Optimización de performance** en dispositivos físicos
+3. **Implementación de logging** para debugging en producción
+4. **Mejoras de UX/UI** basadas en feedback de usuarios
 
 ---
 
-## 📈 **ESTADO FINAL DEL PROYECTO**
+## 📝 **NOTAS IMPORTANTES**
 
-### **🎯 PROYECTO COMPLETAMENTE DOCUMENTADO Y OPTIMIZADO**
-- **Versión**: 1.0.5
-- **Estado**: ✅ Funcionando correctamente
-- **Repositorio**: ✅ Creado en GitHub
-- **Documentación**: ✅ 100% completa
-- **Assets**: ✅ Organizados y documentados
-- **Memory Bank**: ✅ Finalizado
-- **Expo Doctor**: ✅ Problemas resueltos
+### **🔍 Para Futuras Correcciones:**
+1. **Siempre verificar el archivo correcto** antes de hacer cambios
+2. **Usar logs de depuración** para confirmar que los cambios se aplican
+3. **Realizar limpieza de cache** cuando los cambios no se reflejan
+4. **Documentar todos los cambios** en este changelog
 
-### **📊 MÉTRICAS FINALES**
-- **Archivos de código**: 50+
-- **Archivos de documentación**: 8
-- **Archivos de assets**: 4
-- **Commits realizados**: 3
-- **Tiempo de trabajo**: Diciembre 2024
-- **Checks de expo-doctor**: 14/15 pasando
+### **🚨 Problemas Conocidos:**
+- Ninguno identificado actualmente
 
-### **🚀 LISTO PARA DESARROLLO**
-El proyecto está completamente preparado para:
-- Desarrollo continuo
-- Onboarding de nuevos desarrolladores
-- Mantenimiento eficiente
-- Escalabilidad futura
-- Build y deployment sin problemas
-
----
-
-**Última actualización**: Diciembre 2024  
-**Versión actual**: 1.0.5  
-**Estado**: ✅ Completamente documentado, funcional y optimizado  
-**Repositorio**: ✅ Creado en GitHub  
-**Assets**: ✅ Organizados y documentados  
-**Memory Bank**: ✅ Finalizado  
-**Expo Doctor**: ✅ Problemas resueltos  
-
----
-
-> **Este changelog mantiene un registro completo de todos los cambios realizados en el proyecto para facilitar el mantenimiento y desarrollo futuro. El proyecto Factura Móvil 2025 está ahora completamente documentado, optimizado y listo para el desarrollo continuo.**
+### **📞 Contacto:**
+- **Desarrollador**: Rodrigo Fernandez
+- **Email**: rfernandez@facturamovil.cl
+- **Proyecto**: Factura Movil 2025

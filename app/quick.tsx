@@ -18,12 +18,12 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Zap, ArrowLeft, Download, Upload, ShoppingBag, ChartLine as LineChart, TrendingUp, Package, Globe, Instagram, Smartphone, Mail, Building2, CreditCard, Clock, Minus, Plus, TriangleAlert as AlertTriangle, Trash2, X, Check, Search, User, ChevronRight, MapPin, Briefcase, ChevronDown, RefreshCcw, DollarSign, Calendar, FileText, Receipt, Mic } from 'lucide-react-native';
-import { api, Client, Product } from '../../services/api';
-import { useTheme } from '../../context/ThemeContext';
-import { generateInvoice, generateTicket, formatInvoiceData, formatTicketData } from '../../services/invoiceService';
+import { api, Client, Product } from '../services/api';
+import { useTheme } from '../context/ThemeContext';
+import { generateInvoice, generateTicket, formatInvoiceData, formatTicketData } from '../services/invoiceService';
 
 // 🔥 DEBUG LOG - VERIFICAR QUE SE EJECUTA LA VERSIÓN CORRECTA
-console.log('🔥🔥🔥 QUICK.TSX LOADED - VERSION WITH FIXES 🔥🔥🔥');
+console.log('🔥🔥🔥 VOZPOS.TSX LOADED - VERSION WITH FIXES 🔥🔥🔥');
 console.log('🔥🔥🔥 formatPriceAsInteger function available 🔥🔥🔥');
 console.log('🔥🔥🔥 toFixed(1) for additional tax applied 🔥🔥🔥');
 console.log('🔥🔥🔥 calculateProductTotal includes IVA 🔥🔥🔥');
@@ -326,10 +326,6 @@ interface DocumentResponse {
 }
 
 export default function QuickScreen() {
-  console.log('🚀 QUICK SALE SCREEN LOADED - CHANGES APPLIED');
-  console.log('✅ formatPriceAsInteger function available');
-  console.log('✅ toFixed(1) for additional tax applied');
-  
   const router = useRouter();
   const { offlineMode } = useTheme();
   const [products, setProducts] = useState(initialProducts);
@@ -617,16 +613,22 @@ export default function QuickScreen() {
   const handleProductLongPress = (product) => {
     // Provide haptic feedback if available (not on web)
     if (Platform.OS !== 'web') {
-      Vibration.vibrate(100);
+      // Vibración más intensa para confirmar la acción
+      Vibration.vibrate([0, 200, 100, 200]); // Patrón: esperar 0ms, vibrar 200ms, esperar 100ms, vibrar 200ms
     }
     
     setLongPressedProduct(product);
     
-    // Animate the card scale
+    // Animate the card scale with more dramatic effect
     Animated.sequence([
       Animated.timing(scaleAnim, {
-        toValue: 0.9,
-        duration: 100,
+        toValue: 0.85,
+        duration: 150,
+        useNativeDriver: true
+      }),
+      Animated.timing(scaleAnim, {
+        toValue: 1.05,
+        duration: 150,
         useNativeDriver: true
       }),
       Animated.timing(scaleAnim, {
@@ -670,6 +672,11 @@ export default function QuickScreen() {
   // Delete selected product
   const deleteProduct = () => {
     if (!longPressedProduct) return;
+    
+    // Vibración de confirmación al eliminar
+    if (Platform.OS !== 'web') {
+      Vibration.vibrate([0, 100, 50, 100, 50, 100]); // Patrón de confirmación
+    }
     
     const updatedProducts = products.filter(
       product => product.id !== longPressedProduct.id
@@ -749,44 +756,49 @@ export default function QuickScreen() {
   };
 
   const renderProductItem = ({ item }) => (
-    <TouchableOpacity 
-      style={styles.productCard}
-      onPress={() => handleProductPress(item)}
-      onLongPress={() => handleProductLongPress(item)}
-      delayLongPress={3000} // 3 seconds long press to delete
-    >
-      <View style={styles.productImageContainer}>
-        <Image source={{ uri: item.image }} style={styles.productImage} />
-      </View>
-      <Text style={styles.productName} numberOfLines={1}>{item.name}</Text>
-      
-      <View style={styles.productDetails}>
-        <Text style={styles.productPrice}>${formatPriceAsInteger(item.price)}</Text>
-        <View style={styles.quantityContainer}>
-          <Text style={styles.quantityLabel}>Cant:</Text>
-          <Text style={styles.quantityValue}>
-            {item.quantity.toFixed(item.quantity % 1 === 0 ? 0 : 1)}
-          </Text>
-        </View>
-      </View>
-      
-      {/* Showing additional tax if available */}
-      {item.additionalTax && (
-        <View style={styles.additionalTaxContainer}>
-          <AlertTriangle size={10} color="#F6AD55" style={styles.taxIcon} />
-          <Text style={styles.additionalTaxText}>
-            {item.additionalTax.name}: {(item.additionalTax.rate * 100).toFixed(1)}%
-          </Text>
-        </View>
-      )}
-      
-      <View style={styles.productTotal}>
-        <Text style={styles.productTotalText}>
-          Total: ${formatAsInteger(calculateProductTotal(item))}
+  <TouchableOpacity 
+    style={styles.productCard}
+    onPress={() => handleProductPress(item)}
+    onLongPress={() => handleProductLongPress(item)}
+    delayLongPress={1500} // 1.5 seconds long press to delete
+  >
+    <View style={styles.productImageContainer}>
+      <Image source={{ uri: item.image }} style={styles.productImage} />
+    </View>
+    <Text style={styles.productName} numberOfLines={1}>{item.name}</Text>
+    
+    <View style={styles.productDetails}>
+      <Text style={styles.productPrice}>${formatPriceAsInteger(item.price)}</Text>
+      <View style={styles.quantityContainer}>
+        <Text style={styles.quantityLabel}>Cant:</Text>
+        <Text style={styles.quantityValue}>
+          {item.quantity.toFixed(item.quantity % 1 === 0 ? 0 : 1)}
         </Text>
       </View>
-    </TouchableOpacity>
-  );
+    </View>
+    
+    {/* Showing additional tax if available */}
+    {item.additionalTax && (
+      <View style={styles.additionalTaxContainer}>
+        <AlertTriangle size={10} color="#F6AD55" style={styles.taxIcon} />
+        <Text style={styles.additionalTaxText}>
+          {item.additionalTax.name}: {(item.additionalTax.rate * 100).toFixed(1)}%
+        </Text>
+      </View>
+    )}
+    
+    <View style={styles.productTotal}>
+      <Text style={styles.productTotalText}>
+        Total: ${formatAsInteger(calculateProductTotal(item))}
+      </Text>
+    </View>
+    
+    {/* Indicador de long press */}
+    <View style={styles.longPressIndicator}>
+      <Text style={styles.longPressText}>Mantener para eliminar</Text>
+    </View>
+  </TouchableOpacity>
+);
 
   // Clear client search
   const clearSearch = () => {
@@ -2679,6 +2691,22 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#4299E1', // Blue color for total
     textAlign: 'center',
+  },
+  // Indicador de long press
+  longPressIndicator: {
+    marginTop: 4,
+    paddingVertical: 2,
+    paddingHorizontal: 4,
+    backgroundColor: 'rgba(255, 82, 82, 0.1)',
+    borderRadius: 4,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 82, 82, 0.3)',
+  },
+  longPressText: {
+    fontSize: 8,
+    color: '#FF5252',
+    textAlign: 'center',
+    fontWeight: '500',
   },
   // Empty products state
   emptyProductsContainer: {

@@ -1,55 +1,59 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { useRouter } from 'expo-router';
-import { ArrowLeft, Mic, Clock } from 'lucide-react-native';
+import { ArrowLeft, Camera, Clock, Eye, Zap, Brain } from 'lucide-react-native';
 
-export default function VozPosScreen() {
+export default function ViewPosScreen() {
   const router = useRouter();
 
   return (
     <View style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity 
+        <TouchableOpacity
           style={styles.backButton}
           onPress={() => router.back()}
         >
           <ArrowLeft size={24} color="#fff" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>VozPos</Text>
+        <Text style={styles.headerTitle}>ViewPos</Text>
         <View style={styles.placeholder} />
       </View>
 
       {/* Main Content */}
       <View style={styles.content}>
         <View style={styles.iconContainer}>
-          <Mic size={80} color="#F472B6" />
+          <Camera size={80} color="#4CAF50" />
         </View>
-        
+
         <Text style={styles.title}>Próximamente</Text>
-        <Text style={styles.subtitle}>Emitir documentos por voz</Text>
-        
+        <Text style={styles.subtitle}>Captura de productos con IA</Text>
+
         <View style={styles.featuresContainer}>
           <View style={styles.featureItem}>
-            <Clock size={20} color="#A0AEC0" />
-            <Text style={styles.featureText}>Reconocimiento de voz avanzado</Text>
+            <Eye size={20} color="#A0AEC0" />
+            <Text style={styles.featureText}>Reconocimiento visual de productos</Text>
+          </View>
+          <View style={styles.featureItem}>
+            <Brain size={20} color="#A0AEC0" />
+            <Text style={styles.featureText}>Inteligencia artificial avanzada</Text>
+          </View>
+          <View style={styles.featureItem}>
+            <Zap size={20} color="#A0AEC0" />
+            <Text style={styles.featureText}>Carga automática al carrito</Text>
           </View>
           <View style={styles.featureItem}>
             <Clock size={20} color="#A0AEC0" />
-            <Text style={styles.featureText}>Comandos de voz intuitivos</Text>
-          </View>
-          <View style={styles.featureItem}>
-            <Clock size={20} color="#A0AEC0" />
-            <Text style={styles.featureText}>Integración con IA</Text>
+            <Text style={styles.featureText}>Múltiples productos simultáneos</Text>
           </View>
         </View>
 
         <Text style={styles.description}>
-          Estamos trabajando en una experiencia revolucionaria de facturación por voz. 
-          Pronto podrás emitir documentos simplemente hablando.
+          Estamos desarrollando una experiencia revolucionaria de captura de productos mediante visión artificial.
+          Pronto podrás escanear productos con tu cámara y agregarlos automáticamente al carrito de compras.
         </Text>
 
-        <TouchableOpacity 
+        <TouchableOpacity
           style={styles.quickButton}
           onPress={() => router.push('/quick')}
         >
@@ -67,9 +71,9 @@ const styles = StyleSheet.create({
   },
   header: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    paddingTop: 60,
+    justifyContent: 'space-between',
+    paddingTop: 50,
     paddingHorizontal: 20,
     paddingBottom: 20,
   },
@@ -93,22 +97,23 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: 40,
+    paddingHorizontal: 30,
   },
   iconContainer: {
     width: 120,
     height: 120,
     borderRadius: 60,
-    backgroundColor: 'rgba(244, 114, 182, 0.1)',
+    backgroundColor: 'rgba(76, 175, 80, 0.1)',
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 30,
   },
   title: {
-    fontSize: 32,
+    fontSize: 28,
     fontWeight: 'bold',
-    color: '#F472B6',
+    color: '#fff',
     marginBottom: 10,
+    textAlign: 'center',
   },
   subtitle: {
     fontSize: 18,
@@ -117,17 +122,20 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   featuresContainer: {
+    width: '100%',
     marginBottom: 40,
   },
   featureItem: {
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 15,
+    paddingHorizontal: 20,
   },
   featureText: {
     fontSize: 16,
     color: '#E2E8F0',
     marginLeft: 15,
+    flex: 1,
   },
   description: {
     fontSize: 16,
@@ -137,14 +145,17 @@ const styles = StyleSheet.create({
     marginBottom: 40,
   },
   quickButton: {
-    backgroundColor: '#0066CC',
+    backgroundColor: '#4CAF50',
     paddingVertical: 15,
     paddingHorizontal: 30,
-    borderRadius: 10,
+    borderRadius: 25,
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   quickButtonText: {
+    color: '#fff',
     fontSize: 16,
     fontWeight: 'bold',
-    color: '#fff',
+    marginLeft: 10,
   },
 });
