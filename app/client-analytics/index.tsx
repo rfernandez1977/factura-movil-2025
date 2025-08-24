@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -7,8 +7,6 @@ import {
   RefreshControl,
   TouchableOpacity,
   Alert,
-  TextInput,
-  ActivityIndicator,
 } from 'react-native';
 import { 
   Users, 
@@ -18,8 +16,7 @@ import {
   MapPin,
   Briefcase,
   Calendar,
-  Star,
-  Search
+  Star
 } from 'lucide-react-native';
 import { router } from 'expo-router';
 
@@ -27,7 +24,7 @@ import {
   MetricCard, 
   ActionButton, 
   SearchableList 
-} from '../../client-analytics/components';
+} from './components';
 import { 
   colors, 
   typography, 
@@ -38,21 +35,8 @@ import {
   formatNumber,
   formatDate,
   getTrendColor
-} from '../../client-analytics/utils/designSystem';
-import { getClients, generateTopClients, generateBusinessMetrics } from '../../client-analytics/services/api';
-
-// Función debounce para optimizar búsquedas
-const debounce = (func: Function, wait: number) => {
-  let timeout: ReturnType<typeof setTimeout>;
-  return function executedFunction(...args: any[]) {
-    const later = () => {
-      clearTimeout(timeout);
-      func(...args);
-    };
-    clearTimeout(timeout);
-    timeout = setTimeout(later, wait);
-  };
-};
+} from './utils/designSystem';
+import { getClients, generateTopClients, generateBusinessMetrics } from './services/api';
 import { 
   getCachedClients, 
   saveClients, 
@@ -61,23 +45,7 @@ import {
   getCachedBusinessMetrics,
   saveBusinessMetrics,
   isCacheExpired
-} from '../../client-analytics/services/database';
-
-// Función para transformar datos de cliente de la API al formato esperado
-const transformClientData = (apiClient: any) => {
-  return {
-    id: apiClient.id || 0,
-    name: apiClient.name || 'Cliente',
-    code: apiClient.code || 'N/A',
-    municipality: apiClient.municipality?.name || 'N/A',
-    activity: apiClient.activity?.name || 'N/A',
-    totalAmount: apiClient.total_amount || 0,
-    totalPurchases: apiClient.total_purchases || 0,
-    lastPurchaseDate: apiClient.last_purchase_date ? new Date(apiClient.last_purchase_date) : new Date(),
-    growth: apiClient.growth_rate || 0,
-    topProduct: apiClient.top_product || 'N/A',
-  };
-};
+} from './services/database';
 
 // Datos de ejemplo para demostración
 const mockGlobalMetrics = [
@@ -158,15 +126,12 @@ const mockTopClients = [
   },
 ];
 
-export default function ClientsScreen() {
+export default function ClientAnalyticsDashboard() {
   const [refreshing, setRefreshing] = useState(false);
   const [clients, setClients] = useState(mockTopClients);
-  const [filteredClients, setFilteredClients] = useState(mockTopClients);
-  const [searchTerm, setSearchTerm] = useState('');
   const [globalMetrics, setGlobalMetrics] = useState(mockGlobalMetrics);
   const [topClients, setTopClients] = useState(mockTopClients);
   const [loading, setLoading] = useState(true);
-  const [searching, setSearching] = useState(false);
 
   // Cargar datos al montar el componente
   useEffect(() => {
@@ -185,7 +150,6 @@ export default function ClientsScreen() {
       } else {
         await loadFromCache();
       }
-      
     } catch (error) {
       console.error('Error loading data:', error);
       Alert.alert('Error', 'No se pudieron cargar los datos. Verificando caché...');
@@ -199,26 +163,16 @@ export default function ClientsScreen() {
     try {
       // Cargar clientes
       const clientsData = await getClients();
-      const apiClients = clientsData.clients || [];
-      const clientsList = apiClients.map(transformClientData);
+      const clientsList = clientsData.clients || [];
       setClients(clientsList);
-      setFilteredClients(clientsList); // Inicializar filteredClients con todos los clientes
-      await saveClients(apiClients as any); // Guardar los datos originales de la API
+      await saveClients(clientsList);
 
       // Cargar métricas de negocio
       const businessMetrics = await generateBusinessMetrics();
-      
-      // Validar que businessMetrics tenga la estructura esperada
-      const overview = businessMetrics?.overview || {
-        totalClients: 0,
-        totalRevenue: 0,
-        averageRevenuePerClient: 0
-      };
-      
       const metrics = [
         {
           title: 'Total Clientes',
-          value: overview.totalClients || 0,
+          value: businessMetrics.overview.totalClients,
           change: 15,
           trend: 'up' as const,
           icon: <Users size={24} color={colors.primary} />,
@@ -227,7 +181,7 @@ export default function ClientsScreen() {
         },
         {
           title: 'Ingresos Totales',
-          value: overview.totalRevenue || 0,
+          value: businessMetrics.overview.totalRevenue,
           change: 8.5,
           trend: 'up' as const,
           icon: <DollarSign size={24} color={colors.success} />,
@@ -236,7 +190,7 @@ export default function ClientsScreen() {
         },
         {
           title: 'Promedio por Cliente',
-          value: overview.averageRevenuePerClient || 0,
+          value: businessMetrics.overview.averageRevenuePerClient,
           change: -2.1,
           trend: 'down' as const,
           icon: <TrendingUp size={24} color={colors.warning} />,
@@ -258,19 +212,16 @@ export default function ClientsScreen() {
 
       // Cargar top clientes
       const topClientsData = await generateTopClients();
-      
-      // Validar que topClientsData tenga la estructura esperada
-      const byTotalAmount = topClientsData?.byTotalAmount || [];
-      const topClientsList = byTotalAmount.slice(0, 3).map(client => ({
-        id: client?.clientId || 0,
-        name: client?.clientName || 'Cliente',
+      const topClientsList = topClientsData.byTotalAmount.slice(0, 3).map(client => ({
+        id: client.clientId,
+        name: client.clientName,
         code: 'N/A', // Se puede obtener del cliente original
         municipality: 'N/A',
         activity: 'N/A',
-        totalAmount: client?.totalAmount || 0,
-        totalPurchases: client?.totalPurchases || 0,
-        lastPurchaseDate: client?.lastPurchase || new Date(),
-        growth: client?.growthRate || 0,
+        totalAmount: client.totalAmount,
+        totalPurchases: client.totalPurchases,
+        lastPurchaseDate: client.lastPurchase,
+        growth: client.growthRate,
         topProduct: 'N/A',
       }));
       setTopClients(topClientsList);
@@ -287,25 +238,16 @@ export default function ClientsScreen() {
       // Cargar clientes del caché
       const cachedClients = await getCachedClients();
       if (cachedClients.length > 0) {
-        const transformedClients = cachedClients.map(transformClientData);
-        setClients(transformedClients);
-        setFilteredClients(transformedClients); // Inicializar filteredClients con clientes del caché
+        setClients(cachedClients);
       }
 
       // Cargar métricas del caché
       const cachedMetrics = await getCachedBusinessMetrics();
       if (cachedMetrics) {
-        // Validar que cachedMetrics tenga la estructura esperada
-        const overview = cachedMetrics?.overview || {
-          totalClients: 0,
-          totalRevenue: 0,
-          averageRevenuePerClient: 0
-        };
-        
         const metrics = [
           {
             title: 'Total Clientes',
-            value: overview.totalClients || 0,
+            value: cachedMetrics.overview.totalClients,
             change: 15,
             trend: 'up' as const,
             icon: <Users size={24} color={colors.primary} />,
@@ -314,7 +256,7 @@ export default function ClientsScreen() {
           },
           {
             title: 'Ingresos Totales',
-            value: overview.totalRevenue || 0,
+            value: cachedMetrics.overview.totalRevenue,
             change: 8.5,
             trend: 'up' as const,
             icon: <DollarSign size={24} color={colors.success} />,
@@ -323,7 +265,7 @@ export default function ClientsScreen() {
           },
           {
             title: 'Promedio por Cliente',
-            value: overview.averageRevenuePerClient || 0,
+            value: cachedMetrics.overview.averageRevenuePerClient,
             change: -2.1,
             trend: 'down' as const,
             icon: <TrendingUp size={24} color={colors.warning} />,
@@ -346,18 +288,16 @@ export default function ClientsScreen() {
       // Cargar top clientes del caché
       const cachedTopClients = await getCachedTopClients();
       if (cachedTopClients) {
-        // Validar que cachedTopClients tenga la estructura esperada
-        const byTotalAmount = cachedTopClients?.byTotalAmount || [];
-        const topClientsList = byTotalAmount.slice(0, 3).map(client => ({
-          id: client?.clientId || 0,
-          name: client?.clientName || 'Cliente',
+        const topClientsList = cachedTopClients.byTotalAmount.slice(0, 3).map(client => ({
+          id: client.clientId,
+          name: client.clientName,
           code: 'N/A',
           municipality: 'N/A',
           activity: 'N/A',
-          totalAmount: client?.totalAmount || 0,
-          totalPurchases: client?.totalPurchases || 0,
-          lastPurchaseDate: client?.lastPurchase || new Date(),
-          growth: client?.growthRate || 0,
+          totalAmount: client.totalAmount,
+          totalPurchases: client.totalPurchases,
+          lastPurchaseDate: client.lastPurchase,
+          growth: client.growthRate,
           topProduct: 'N/A',
         }));
         setTopClients(topClientsList);
@@ -375,141 +315,62 @@ export default function ClientsScreen() {
   };
 
   const handleClientPress = (client: any) => {
-    // Usar el RUT (code) en lugar del ID para la búsqueda
-    const clientRut = client.code || client.id;
-    router.push(`/client-analytics/profile/${clientRut}`);
+    router.push(`/client-analytics/profile/${client.id}`);
   };
 
   const handleNewClient = () => {
     router.push('/client-analytics/new-client');
   };
 
-  // Función de búsqueda con debounce
-  const searchClients = async (term: string) => {
-    try {
-      setSearching(true);
-      setSearchTerm(term);
+  const renderClientCard = (client: any) => (
+    <View style={styles.clientCard}>
+      <View style={styles.clientHeader}>
+        <View style={styles.clientInfo}>
+          <Text style={styles.clientName}>{client.name}</Text>
+          <Text style={styles.clientCode}>{client.code}</Text>
+        </View>
+        <View style={styles.clientLocation}>
+          <MapPin size={16} color={colors.textSecondary} />
+          <Text style={styles.locationText}>{client.municipality}</Text>
+        </View>
+      </View>
       
-      if (!term.trim()) {
-        // Si no hay término de búsqueda, mostrar todos los clientes
-        setFilteredClients(clients);
-        return;
-      }
-      
-      // Llamar a la API con el término de búsqueda
-      const searchResults = await getClients(term.trim());
-      const apiFilteredList = searchResults?.clients || [];
-      const filteredList = apiFilteredList.map(transformClientData);
-      
-      setFilteredClients(filteredList);
-      
-    } catch (error) {
-      console.error('Error searching clients:', error);
-      // En caso de error, filtrar localmente
-      const localFiltered = clients.filter(client => 
-        client.name?.toLowerCase().includes(term.toLowerCase()) ||
-        client.code?.toLowerCase().includes(term.toLowerCase()) ||
-        client.municipality?.toLowerCase().includes(term.toLowerCase())
-      );
-      setFilteredClients(localFiltered);
-    } finally {
-      setSearching(false);
-    }
-  };
-
-  // Debounce para la búsqueda
-  const debouncedSearch = useCallback(
-    debounce((term: string) => {
-      searchClients(term);
-    }, 500),
-    [clients]
-  );
-
-  const handleSearchChange = (text: string) => {
-    setSearchTerm(text);
-    debouncedSearch(text);
-  };
-
-  const renderClientCard = (client: any) => {
-    // Validar que client existe y tiene las propiedades necesarias
-    if (!client) return null;
-    
-    // Función helper para convertir cualquier valor a string
-    const safeString = (value: any): string => {
-      if (value === null || value === undefined) return 'N/A';
-      if (typeof value === 'string') return value;
-      if (typeof value === 'number') return value.toString();
-      if (typeof value === 'object') {
-        // Si es un objeto, intentar extraer propiedades útiles
-        if (value.name) return safeString(value.name);
-        if (value.code) return safeString(value.code);
-        if (value.id) return safeString(value.id);
-        return 'N/A';
-      }
-      return String(value);
-    };
-    
-    // Función helper para convertir a número
-    const safeNumber = (value: any): number => {
-      if (value === null || value === undefined) return 0;
-      if (typeof value === 'number') return value;
-      if (typeof value === 'string') {
-        const parsed = parseFloat(value);
-        return isNaN(parsed) ? 0 : parsed;
-      }
-      return 0;
-    };
-    
-    return (
-      <View style={styles.clientCard}>
-        <View style={styles.clientHeader}>
-          <View style={styles.clientInfo}>
-            <Text style={styles.clientName}>{safeString(client.name)}</Text>
-            <Text style={styles.clientCode}>{safeString(client.code)}</Text>
+      <View style={styles.clientDetails}>
+        <View style={styles.detailRow}>
+          <Briefcase size={16} color={colors.textSecondary} />
+          <Text style={styles.detailText}>{client.activity}</Text>
+        </View>
+        
+        <View style={styles.metricsRow}>
+          <View style={styles.metric}>
+            <Text style={styles.metricValue}>{formatCurrency(client.totalAmount)}</Text>
+            <Text style={styles.metricLabel}>Total</Text>
           </View>
-          <View style={styles.clientLocation}>
-            <MapPin size={16} color={colors.textSecondary} />
-            <Text style={styles.locationText}>{safeString(client.municipality)}</Text>
+          <View style={styles.metric}>
+            <Text style={styles.metricValue}>{client.totalPurchases}</Text>
+            <Text style={styles.metricLabel}>Compras</Text>
+          </View>
+          <View style={styles.metric}>
+            <Text style={styles.metricValue}>{formatDate(client.lastPurchaseDate)}</Text>
+            <Text style={styles.metricLabel}>Última</Text>
           </View>
         </View>
         
-        <View style={styles.clientDetails}>
-          <View style={styles.detailRow}>
-            <Briefcase size={16} color={colors.textSecondary} />
-            <Text style={styles.detailText}>{safeString(client.activity)}</Text>
+        <View style={styles.growthRow}>
+          <View style={[styles.growthBadge, { backgroundColor: `${getTrendColor('up')}15` }]}>
+            <TrendingUp size={14} color={getTrendColor('up')} />
+            <Text style={[styles.growthText, { color: getTrendColor('up') }]}>
+              +{client.growth}%
+            </Text>
           </View>
-          
-          <View style={styles.metricsRow}>
-            <View style={styles.metric}>
-              <Text style={styles.metricValue}>{formatCurrency(safeNumber(client.totalAmount))}</Text>
-              <Text style={styles.metricLabel}>Total</Text>
-            </View>
-            <View style={styles.metric}>
-              <Text style={styles.metricValue}>{safeNumber(client.totalPurchases)}</Text>
-              <Text style={styles.metricLabel}>Compras</Text>
-            </View>
-            <View style={styles.metric}>
-              <Text style={styles.metricValue}>{formatDate(client.lastPurchaseDate)}</Text>
-              <Text style={styles.metricLabel}>Última</Text>
-            </View>
-          </View>
-          
-          <View style={styles.growthRow}>
-            <View style={[styles.growthBadge, { backgroundColor: `${getTrendColor('up')}15` }]}>
-              <TrendingUp size={14} color={getTrendColor('up')} />
-              <Text style={[styles.growthText, { color: getTrendColor('up') }]}>
-                +{safeNumber(client.growth)}%
-              </Text>
-            </View>
-            <View style={styles.topProduct}>
-              <Star size={14} color={colors.accent} />
-              <Text style={styles.topProductText}>{safeString(client.topProduct)}</Text>
-            </View>
+          <View style={styles.topProduct}>
+            <Star size={14} color={colors.accent} />
+            <Text style={styles.topProductText}>{client.topProduct}</Text>
           </View>
         </View>
       </View>
-    );
-  };
+    </View>
+  );
 
   return (
     <ScrollView 
@@ -569,49 +430,14 @@ export default function ClientsScreen() {
       {/* Lista de Clientes */}
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Todos los Clientes</Text>
-        
-        {/* Campo de Búsqueda */}
-        <View style={styles.searchContainer}>
-          <View style={styles.searchInputContainer}>
-            <Search size={20} color={colors.textSecondary} />
-            <TextInput
-              style={styles.searchInput}
-              placeholder="Buscar clientes por nombre, RUT o municipio..."
-              placeholderTextColor={colors.textSecondary}
-              value={searchTerm}
-              onChangeText={handleSearchChange}
-              autoCapitalize="none"
-              autoCorrect={false}
-            />
-            {searching && (
-              <ActivityIndicator size="small" color={colors.primary} />
-            )}
-          </View>
-          {searchTerm && (
-            <Text style={styles.searchResults}>
-              {searching ? 'Buscando...' : `${filteredClients.length} resultado${filteredClients.length !== 1 ? 's' : ''} encontrado${filteredClients.length !== 1 ? 's' : ''}`}
-            </Text>
-          )}
-        </View>
-        <View style={styles.clientsListContainer}>
-          {filteredClients.map((client) => (
-            <TouchableOpacity
-              key={client.id}
-              style={styles.clientCardContainer}
-              onPress={() => handleClientPress(client)}
-              activeOpacity={0.7}
-            >
-              {renderClientCard(client)}
-            </TouchableOpacity>
-          ))}
-          {filteredClients.length === 0 && (
-            <View style={styles.emptyContainer}>
-              <Text style={styles.emptyText}>
-                {searchTerm ? 'No se encontraron clientes que coincidan con la búsqueda' : 'No se encontraron clientes'}
-              </Text>
-            </View>
-          )}
-        </View>
+        <SearchableList
+          data={clients}
+          searchPlaceholder="Buscar por RUT o nombre..."
+          renderItem={renderClientCard}
+          onItemPress={handleClientPress}
+          onRefresh={handleRefresh}
+          emptyMessage="No se encontraron clientes"
+        />
       </View>
     </ScrollView>
   );
@@ -650,35 +476,6 @@ const styles = StyleSheet.create({
     ...typography.h2,
     color: colors.textPrimary,
     marginBottom: spacing.md,
-  },
-  
-  searchContainer: {
-    marginBottom: spacing.md,
-  },
-  
-  searchInputContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.surface,
-    borderRadius: borders.radius.lg,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    borderWidth: 1,
-    borderColor: colors.textDisabled,
-  },
-  
-  searchInput: {
-    flex: 1,
-    marginLeft: spacing.sm,
-    ...typography.body1,
-    color: colors.textPrimary,
-  },
-  
-  searchResults: {
-    ...typography.caption,
-    color: colors.textSecondary,
-    marginTop: spacing.xs,
-    textAlign: 'center',
   },
   
   metricsGrid: {
@@ -812,18 +609,5 @@ const styles = StyleSheet.create({
     ...typography.caption,
     color: colors.textSecondary,
     marginLeft: spacing.xs,
-  },
-  clientsListContainer: {
-    gap: spacing.md,
-  },
-  emptyContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: spacing.xl,
-  },
-  emptyText: {
-    ...typography.body1,
-    color: colors.textSecondary,
-    textAlign: 'center',
   },
 });

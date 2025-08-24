@@ -69,6 +69,12 @@ export default function InvoiceDetailsScreen() {
       } else {
         throw new Error('No invoice ID or folio provided');
       }
+      
+      // DEBUG: Log the complete response to see what fields are available
+      console.log('[INVOICE_DETAILS] Complete API response:', JSON.stringify(response, null, 2));
+      console.log('[INVOICE_DETAILS] Document type field:', response.type);
+      console.log('[INVOICE_DETAILS] Document type field type:', typeof response.type);
+      
       setInvoice(response);
       setError(null);
       if (response.client?.email) {
@@ -86,10 +92,19 @@ export default function InvoiceDetailsScreen() {
     if (!invoice) return;
     try {
       setLoadingPdf(true);
-      const url = await api.getInvoicePdf(invoice.id, invoice.validation);
+      
+      // Validar que tenemos la información correcta del documento
+      console.log('[INVOICE_DETAILS] Document info for PDF:', {
+        id: invoice.id,
+        type: invoice.type,
+        folio: invoice.assignedFolio,
+        validation: invoice.validation?.substring(0, 10) + '...'
+      });
+      
+      const url = await api.getInvoicePdf(invoice.id, invoice.validation, invoice.type);
       setPdfUrl(url);
       setShowPdf(true);
-      console.log('[INVOICE_DETAILS] Viewing PDF:', url);
+      console.log('[INVOICE_DETAILS] Viewing PDF:', url, 'for document type:', invoice.type);
     } catch (err) {
       console.error('Error getting PDF:', err);
       Alert.alert('Error', 'No se pudo obtener el PDF de la factura');
@@ -102,7 +117,7 @@ export default function InvoiceDetailsScreen() {
     if (!invoice) return;
     try {
       setLoadingPdf(true);
-      const url = await api.getInvoicePdf(invoice.id, invoice.validation);
+      const url = await api.getInvoicePdf(invoice.id, invoice.validation, invoice.type);
       if (Platform.OS === 'web') {
         window.open(url, '_blank');
       } else {
@@ -113,7 +128,7 @@ export default function InvoiceDetailsScreen() {
           Alert.alert('Error', 'No se puede abrir el PDF en este dispositivo');
         }
       }
-      console.log('[INVOICE_DETAILS] Downloading PDF:', url);
+      console.log('[INVOICE_DETAILS] Downloading PDF:', url, 'for document type:', invoice.type);
     } catch (err) {
       console.error('Error downloading PDF:', err);
       Alert.alert('Error', 'No se pudo descargar el PDF de la factura');
@@ -164,7 +179,7 @@ export default function InvoiceDetailsScreen() {
     
     try {
       setPrintingPdf(true);
-      const url = pdfUrl || await api.getInvoicePdf(invoice.id, invoice.validation);
+      const url = pdfUrl || await api.getInvoicePdf(invoice.id, invoice.validation, invoice.type);
       if (!pdfUrl) {
         setPdfUrl(url);
       }

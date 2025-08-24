@@ -160,6 +160,14 @@ export default function LastSalesScreen() {
           <View style={styles.documentType}>
             <Text style={styles.documentTypeText}>{item.type || 'Documento'}</Text>
             <Text style={styles.documentFolio}>N° {item.assignedFolio}</Text>
+            {item.type && item.type !== 'Documento' && (
+              <Text style={styles.documentTypeDetail}>
+                {item.type === 'FACTURA' ? 'Electrónica' : 
+                 item.type === 'FACTURA_EXENTA' ? 'Exenta' :
+                 item.type === 'FACTURA_NO_AFECTA' ? 'No Afecta' :
+                 item.type}
+              </Text>
+            )}
           </View>
           <View style={[
             styles.statusBadge,
@@ -431,6 +439,12 @@ const styles = StyleSheet.create({
   documentFolio: {
     fontSize: 14,
     color: '#666',
+  },
+  documentTypeDetail: {
+    fontSize: 12,
+    color: '#999',
+    fontStyle: 'italic',
+    marginTop: 2,
   },
   statusBadge: {
     flexDirection: 'row',

@@ -510,6 +510,12 @@ const getInvoiceDetail = async (assignedFolio: string): Promise<Document> => {
       if (!response.data) {
         throw new Error('Invalid invoice detail response: No data received');
       }
+      
+      // DEBUG: Log the raw API response
+      console.log('[API] Raw invoice detail response:', JSON.stringify(response.data, null, 2));
+      console.log('[API] Invoice detail type field:', response.data.type);
+      console.log('[API] Invoice detail type field type:', typeof response.data.type);
+      
       return response.data;
     };
     
@@ -553,9 +559,16 @@ const getInvoiceDetailById = async (invoiceId: number): Promise<Document> => {
   }
 };
 
-const getInvoicePdf = async (id: number, validation: string): Promise<string> => {
+const getInvoicePdf = async (id: number, validation: string, documentType?: string): Promise<string> => {
   try {
-    const pdfUrl = `${API_BASE}/document/toPdf/${id}?v=${validation}`;
+    // Construir URL base
+    let pdfUrl = `${API_BASE}/document/toPdf/${id}?v=${validation}`;
+    
+    // Agregar tipo de documento si está disponible para diferenciar entre tipos
+    if (documentType) {
+      pdfUrl += `&type=${encodeURIComponent(documentType)}`;
+    }
+    
     return pdfUrl;
   } catch (error) {
     console.error('Error generating PDF URL:', error);
