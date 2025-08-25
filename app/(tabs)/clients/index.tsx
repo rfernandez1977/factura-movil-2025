@@ -1,829 +1,341 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import {
-  View,
-  Text,
-  ScrollView,
+import React, { useState, useEffect, useCallback, lazy, Suspense } from 'react';
+import { 
+  View, 
+  Text, 
   StyleSheet,
-  RefreshControl,
-  TouchableOpacity,
-  Alert,
+  FlatList, 
+  TouchableOpacity, 
   TextInput,
+  RefreshControl,
   ActivityIndicator,
+  Alert
 } from 'react-native';
-import { 
-  Users, 
-  DollarSign, 
-  TrendingUp, 
-  Plus,
-  MapPin,
-  Briefcase,
-  Calendar,
-  Star,
-  Search
-} from 'lucide-react-native';
-import { router } from 'expo-router';
+import { useRouter } from 'expo-router';
+import { Search, ListFilter as Filter, Plus, Building2, User, Phone, MapPin, ChevronRight } from 'lucide-react-native';
+// import Header from '../../../components/Header';
+// import { api, Client } from '../../../services/api';
+// import { useTheme } from '../../../context/ThemeContext';
 
-import { 
-  MetricCard, 
-  ActionButton, 
-  SearchableList 
-} from '../../client-analytics/components';
-import { 
-  colors, 
-  typography, 
-  spacing, 
-  borders,
-  layoutStyles,
-  formatCurrency,
-  formatNumber,
-  formatDate,
-  getTrendColor
-} from '../../client-analytics/utils/designSystem';
-import { getClients, generateTopClients, generateBusinessMetrics } from '../../client-analytics/services/api';
+// Lazy load ClientCard component
+// const ClientCard = lazy(() => import('../../../components/ClientCard'));
 
-// Función debounce para optimizar búsquedas
-const debounce = (func: Function, wait: number) => {
-  let timeout: ReturnType<typeof setTimeout>;
-  return function executedFunction(...args: any[]) {
-    const later = () => {
-      clearTimeout(timeout);
-      func(...args);
-    };
-    clearTimeout(timeout);
-    timeout = setTimeout(later, wait);
-  };
-};
-import { 
-  getCachedClients, 
-  saveClients, 
-  getCachedTopClients, 
-  saveTopClients,
-  getCachedBusinessMetrics,
-  saveBusinessMetrics,
-  isCacheExpired
-} from '../../client-analytics/services/database';
-
-// Función para transformar datos de cliente de la API al formato esperado
-const transformClientData = (apiClient: any) => {
-  return {
-    id: apiClient.id || 0,
-    name: apiClient.name || 'Cliente',
-    code: apiClient.code || 'N/A',
-    municipality: apiClient.municipality?.name || 'N/A',
-    activity: apiClient.activity?.name || 'N/A',
-    totalAmount: apiClient.total_amount || 0,
-    totalPurchases: apiClient.total_purchases || 0,
-    lastPurchaseDate: apiClient.last_purchase_date ? new Date(apiClient.last_purchase_date) : new Date(),
-    growth: apiClient.growth_rate || 0,
-    topProduct: apiClient.top_product || 'N/A',
-  };
-};
-
-// Datos de ejemplo para demostración
-const mockGlobalMetrics = [
-  {
-    title: 'Total Clientes',
-    value: 1234,
-    change: 15,
-    trend: 'up' as const,
-    icon: <Users size={24} color={colors.primary} />,
-    color: colors.primary,
-    format: 'number' as const,
-  },
-  {
-    title: 'Ingresos Totales',
-    value: 12345678,
-    change: 8.5,
-    trend: 'up' as const,
-    icon: <DollarSign size={24} color={colors.success} />,
-    color: colors.success,
-    format: 'currency' as const,
-  },
-  {
-    title: 'Promedio por Cliente',
-    value: 9876,
-    change: -2.1,
-    trend: 'down' as const,
-    icon: <TrendingUp size={24} color={colors.warning} />,
-    color: colors.warning,
-    format: 'currency' as const,
-  },
-  {
-    title: 'Crecimiento',
-    value: 12.5,
-    change: 3.2,
-    trend: 'up' as const,
-    icon: <TrendingUp size={24} color={colors.info} />,
-    color: colors.info,
-    format: 'percentage' as const,
-  },
-];
-
-const mockTopClients = [
-  {
-    id: 1,
-    name: 'FACTURA MOVIL SPA',
-    code: '76212889-6',
-    municipality: 'San Antonio',
-    activity: 'Desarrollo de Software',
-    totalAmount: 50000,
-    totalPurchases: 12,
-    lastPurchaseDate: new Date('2025-08-23'),
-    growth: 25,
-    topProduct: 'Wisky',
-  },
-  {
-    id: 2,
-    name: 'AGRICOLA LOS DOS LIMITADA',
-    code: '76071974-9',
-    municipality: 'Curico',
-    activity: 'Agricultura',
-    totalAmount: 45000,
-    totalPurchases: 8,
-    lastPurchaseDate: new Date('2025-08-22'),
-    growth: 12,
-    topProduct: 'Fertilizante',
-  },
-  {
-    id: 3,
-    name: 'CONSTRUCTORA EJEMPLO LTDA',
-    code: '76543210-1',
-    municipality: 'Santiago',
-    activity: 'Construcción',
-    totalAmount: 40000,
-    totalPurchases: 15,
-    lastPurchaseDate: new Date('2025-08-21'),
-    growth: 18,
-    topProduct: 'Cemento',
-  },
-];
+// Placeholder component while ClientCard is loading
+const ClientCardPlaceholder = () => (
+  <View style={styles.clientCardPlaceholder}>
+    <ActivityIndicator size="small" color="#0066CC" />
+  </View>
+);
 
 export default function ClientsScreen() {
-  const [refreshing, setRefreshing] = useState(false);
-  const [clients, setClients] = useState(mockTopClients);
-  const [filteredClients, setFilteredClients] = useState(mockTopClients);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [globalMetrics, setGlobalMetrics] = useState(mockGlobalMetrics);
-  const [topClients, setTopClients] = useState(mockTopClients);
-  const [loading, setLoading] = useState(true);
-  const [searching, setSearching] = useState(false);
+  const router = useRouter();
+  // const { offlineMode } = useTheme();
+  
+  const [searchQuery, setSearchQuery] = useState('');
+  const [clients, setClients] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isSearching, setIsSearching] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
 
-  // Cargar datos al montar el componente
+  // Debounce search term to avoid making too many API calls
   useEffect(() => {
-    loadData();
+    const timerId = setTimeout(() => {
+      setDebouncedSearchTerm(searchQuery);
+    }, 500);
+
+    return () => clearTimeout(timerId);
+  }, [searchQuery]);
+
+  // Initial load of clients
+  const loadClients = useCallback(async (forceRefresh = false, searchTerm = '') => {
+    try {
+      setError(null);
+      if (searchTerm) {
+        setIsSearching(true);
+      }
+      
+      // const data = await api.getClients(forceRefresh, searchTerm);
+      // setClients(data);
+      setClients([]); // Placeholder data
+    } catch (err) {
+      setError('Error al cargar los clientes. Por favor intente nuevamente.');
+      Alert.alert(
+        'Error',
+        'No se pudieron cargar los clientes. Verifique su conexión.'
+      );
+    } finally {
+      setIsLoading(false);
+      setIsRefreshing(false);
+      setIsSearching(false);
+    }
   }, []);
 
-  const loadData = async (forceRefresh = false) => {
-    try {
-      setLoading(true);
-      
-      // Verificar si necesitamos refrescar datos
-      const cacheExpired = await isCacheExpired(24); // 24 horas
-      
-      if (forceRefresh || cacheExpired) {
-        await loadFromAPI();
-      } else {
-        await loadFromCache();
-      }
-      
-    } catch (error) {
-      console.error('Error loading data:', error);
-      Alert.alert('Error', 'No se pudieron cargar los datos. Verificando caché...');
-      await loadFromCache();
-    } finally {
-      setLoading(false);
-    }
-  };
+  // Load initial clients
+  useEffect(() => {
+    loadClients();
+  }, [loadClients]);
 
-  const loadFromAPI = async () => {
-    try {
-      // Cargar clientes
-      const clientsData = await getClients();
-      const apiClients = clientsData.clients || [];
-      const clientsList = apiClients.map(transformClientData);
-      setClients(clientsList);
-      setFilteredClients(clientsList); // Inicializar filteredClients con todos los clientes
-      await saveClients(apiClients as any); // Guardar los datos originales de la API
+  // Load clients when debounced search term changes
+  useEffect(() => {
+    loadClients(true, debouncedSearchTerm);
+  }, [debouncedSearchTerm, loadClients]);
 
-      // Cargar métricas de negocio
-      const businessMetrics = await generateBusinessMetrics();
-      
-      // Validar que businessMetrics tenga la estructura esperada
-      const overview = businessMetrics?.overview || {
-        totalClients: 0,
-        totalRevenue: 0,
-        averageRevenuePerClient: 0
-      };
-      
-      const metrics = [
-        {
-          title: 'Total Clientes',
-          value: overview.totalClients || 0,
-          change: 15,
-          trend: 'up' as const,
-          icon: <Users size={24} color={colors.primary} />,
-          color: colors.primary,
-          format: 'number' as const,
-        },
-        {
-          title: 'Ingresos Totales',
-          value: overview.totalRevenue || 0,
-          change: 8.5,
-          trend: 'up' as const,
-          icon: <DollarSign size={24} color={colors.success} />,
-          color: colors.success,
-          format: 'currency' as const,
-        },
-        {
-          title: 'Promedio por Cliente',
-          value: overview.averageRevenuePerClient || 0,
-          change: -2.1,
-          trend: 'down' as const,
-          icon: <TrendingUp size={24} color={colors.warning} />,
-          color: colors.warning,
-          format: 'currency' as const,
-        },
-        {
-          title: 'Crecimiento',
-          value: 12.5,
-          change: 3.2,
-          trend: 'up' as const,
-          icon: <TrendingUp size={24} color={colors.info} />,
-          color: colors.info,
-          format: 'percentage' as const,
-        },
-      ];
-      setGlobalMetrics(metrics);
-      await saveBusinessMetrics(businessMetrics);
+  const onRefresh = useCallback(() => {
+    setIsRefreshing(true);
+    loadClients(true);
+  }, [loadClients]);
 
-      // Cargar top clientes
-      const topClientsData = await generateTopClients();
-      
-      // Validar que topClientsData tenga la estructura esperada
-      const byTotalAmount = topClientsData?.byTotalAmount || [];
-      const topClientsList = byTotalAmount.slice(0, 3).map(client => ({
-        id: client?.clientId || 0,
-        name: client?.clientName || 'Cliente',
-        code: 'N/A', // Se puede obtener del cliente original
-        municipality: 'N/A',
-        activity: 'N/A',
-        totalAmount: client?.totalAmount || 0,
-        totalPurchases: client?.totalPurchases || 0,
-        lastPurchaseDate: client?.lastPurchase || new Date(),
-        growth: client?.growthRate || 0,
-        topProduct: 'N/A',
-      }));
-      setTopClients(topClientsList);
-      await saveTopClients(topClientsData);
-
-    } catch (error) {
-      console.error('Error loading from API:', error);
-      throw error;
-    }
-  };
-
-  const loadFromCache = async () => {
-    try {
-      // Cargar clientes del caché
-      const cachedClients = await getCachedClients();
-      if (cachedClients.length > 0) {
-        const transformedClients = cachedClients.map(transformClientData);
-        setClients(transformedClients);
-        setFilteredClients(transformedClients); // Inicializar filteredClients con clientes del caché
-      }
-
-      // Cargar métricas del caché
-      const cachedMetrics = await getCachedBusinessMetrics();
-      if (cachedMetrics) {
-        // Validar que cachedMetrics tenga la estructura esperada
-        const overview = cachedMetrics?.overview || {
-          totalClients: 0,
-          totalRevenue: 0,
-          averageRevenuePerClient: 0
-        };
-        
-        const metrics = [
-          {
-            title: 'Total Clientes',
-            value: overview.totalClients || 0,
-            change: 15,
-            trend: 'up' as const,
-            icon: <Users size={24} color={colors.primary} />,
-            color: colors.primary,
-            format: 'number' as const,
-          },
-          {
-            title: 'Ingresos Totales',
-            value: overview.totalRevenue || 0,
-            change: 8.5,
-            trend: 'up' as const,
-            icon: <DollarSign size={24} color={colors.success} />,
-            color: colors.success,
-            format: 'currency' as const,
-          },
-          {
-            title: 'Promedio por Cliente',
-            value: overview.averageRevenuePerClient || 0,
-            change: -2.1,
-            trend: 'down' as const,
-            icon: <TrendingUp size={24} color={colors.warning} />,
-            color: colors.warning,
-            format: 'currency' as const,
-          },
-          {
-            title: 'Crecimiento',
-            value: 12.5,
-            change: 3.2,
-            trend: 'up' as const,
-            icon: <TrendingUp size={24} color={colors.info} />,
-            color: colors.info,
-            format: 'percentage' as const,
-          },
-        ];
-        setGlobalMetrics(metrics);
-      }
-
-      // Cargar top clientes del caché
-      const cachedTopClients = await getCachedTopClients();
-      if (cachedTopClients) {
-        // Validar que cachedTopClients tenga la estructura esperada
-        const byTotalAmount = cachedTopClients?.byTotalAmount || [];
-        const topClientsList = byTotalAmount.slice(0, 3).map(client => ({
-          id: client?.clientId || 0,
-          name: client?.clientName || 'Cliente',
-          code: 'N/A',
-          municipality: 'N/A',
-          activity: 'N/A',
-          totalAmount: client?.totalAmount || 0,
-          totalPurchases: client?.totalPurchases || 0,
-          lastPurchaseDate: client?.lastPurchase || new Date(),
-          growth: client?.growthRate || 0,
-          topProduct: 'N/A',
-        }));
-        setTopClients(topClientsList);
-      }
-
-    } catch (error) {
-      console.error('Error loading from cache:', error);
-    }
-  };
-
-  const handleRefresh = async () => {
-    setRefreshing(true);
-    await loadData(true); // Forzar refresco
-    setRefreshing(false);
-  };
-
-  const handleClientPress = (client: any) => {
-    // Usar el RUT (code) en lugar del ID para la búsqueda
-    const clientRut = client.code || client.id;
-    router.push(`/client-analytics/profile/${clientRut}`);
-  };
-
-  const handleNewClient = () => {
-    router.push('/client-analytics/new-client');
-  };
-
-  // Función de búsqueda con debounce
-  const searchClients = async (term: string) => {
-    try {
-      setSearching(true);
-      setSearchTerm(term);
-      
-      if (!term.trim()) {
-        // Si no hay término de búsqueda, mostrar todos los clientes
-        setFilteredClients(clients);
-        return;
-      }
-      
-      // Llamar a la API con el término de búsqueda
-      const searchResults = await getClients(term.trim());
-      const apiFilteredList = searchResults?.clients || [];
-      const filteredList = apiFilteredList.map(transformClientData);
-      
-      setFilteredClients(filteredList);
-      
-    } catch (error) {
-      console.error('Error searching clients:', error);
-      // En caso de error, filtrar localmente
-      const localFiltered = clients.filter(client => 
-        client.name?.toLowerCase().includes(term.toLowerCase()) ||
-        client.code?.toLowerCase().includes(term.toLowerCase()) ||
-        client.municipality?.toLowerCase().includes(term.toLowerCase())
-      );
-      setFilteredClients(localFiltered);
-    } finally {
-      setSearching(false);
-    }
-  };
-
-  // Debounce para la búsqueda
-  const debouncedSearch = useCallback(
-    debounce((term: string) => {
-      searchClients(term);
-    }, 500),
-    [clients]
+  const renderItem = ({ item }: { item: any }) => (
+    <Suspense fallback={<ClientCardPlaceholder />}>
+      {/* <ClientCard item={item} onPress={() => router.push(`/clients/${item.id}`)} /> */}
+      <View style={styles.clientCardPlaceholder}>
+        <Text>Cliente: {item.name || 'N/A'}</Text>
+      </View>
+    </Suspense>
   );
 
-  const handleSearchChange = (text: string) => {
-    setSearchTerm(text);
-    debouncedSearch(text);
-  };
-
-  const renderClientCard = (client: any) => {
-    // Validar que client existe y tiene las propiedades necesarias
-    if (!client) return null;
-    
-    // Función helper para convertir cualquier valor a string
-    const safeString = (value: any): string => {
-      if (value === null || value === undefined) return 'N/A';
-      if (typeof value === 'string') return value;
-      if (typeof value === 'number') return value.toString();
-      if (typeof value === 'object') {
-        // Si es un objeto, intentar extraer propiedades útiles
-        if (value.name) return safeString(value.name);
-        if (value.code) return safeString(value.code);
-        if (value.id) return safeString(value.id);
-        return 'N/A';
-      }
-      return String(value);
-    };
-    
-    // Función helper para convertir a número
-    const safeNumber = (value: any): number => {
-      if (value === null || value === undefined) return 0;
-      if (typeof value === 'number') return value;
-      if (typeof value === 'string') {
-        const parsed = parseFloat(value);
-        return isNaN(parsed) ? 0 : parsed;
-      }
-      return 0;
-    };
-    
+  if (isLoading) {
     return (
-      <View style={styles.clientCard}>
-        <View style={styles.clientHeader}>
-          <View style={styles.clientInfo}>
-            <Text style={styles.clientName}>{safeString(client.name)}</Text>
-            <Text style={styles.clientCode}>{safeString(client.code)}</Text>
-          </View>
-          <View style={styles.clientLocation}>
-            <MapPin size={16} color={colors.textSecondary} />
-            <Text style={styles.locationText}>{safeString(client.municipality)}</Text>
-          </View>
-        </View>
-        
-        <View style={styles.clientDetails}>
-          <View style={styles.detailRow}>
-            <Briefcase size={16} color={colors.textSecondary} />
-            <Text style={styles.detailText}>{safeString(client.activity)}</Text>
-          </View>
-          
-          <View style={styles.metricsRow}>
-            <View style={styles.metric}>
-              <Text style={styles.metricValue}>{formatCurrency(safeNumber(client.totalAmount))}</Text>
-              <Text style={styles.metricLabel}>Total</Text>
-            </View>
-            <View style={styles.metric}>
-              <Text style={styles.metricValue}>{safeNumber(client.totalPurchases)}</Text>
-              <Text style={styles.metricLabel}>Compras</Text>
-            </View>
-            <View style={styles.metric}>
-              <Text style={styles.metricValue}>{formatDate(client.lastPurchaseDate)}</Text>
-              <Text style={styles.metricLabel}>Última</Text>
-            </View>
-          </View>
-          
-          <View style={styles.growthRow}>
-            <View style={[styles.growthBadge, { backgroundColor: `${getTrendColor('up')}15` }]}>
-              <TrendingUp size={14} color={getTrendColor('up')} />
-              <Text style={[styles.growthText, { color: getTrendColor('up') }]}>
-                +{safeNumber(client.growth)}%
-              </Text>
-            </View>
-            <View style={styles.topProduct}>
-              <Star size={14} color={colors.accent} />
-              <Text style={styles.topProductText}>{safeString(client.topProduct)}</Text>
-            </View>
-          </View>
+      <View style={styles.container}>
+        {/* <Header title="Clientes" /> */}
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#0066CC" />
+          <Text style={styles.loadingText}>Cargando clientes...</Text>
         </View>
       </View>
     );
-  };
+  }
 
   return (
-    <ScrollView 
-      style={styles.container}
-      refreshControl={
-        <RefreshControl
-          refreshing={refreshing}
-          onRefresh={handleRefresh}
-          colors={[colors.primary]}
-          tintColor={colors.primary}
-        />
-      }
-    >
-      {/* Header */}
-      <View style={styles.header}>
-        <View style={styles.headerContent}>
-          <Text style={styles.title}>Análisis de Clientes</Text>
-          <ActionButton
-            title="Nuevo Cliente"
-            icon={<Plus size={20} color={colors.surface} />}
-            variant="primary"
-            size="small"
-            onPress={handleNewClient}
+    <View style={styles.container}>
+      {/* <Header title="Clientes" /> */}
+      
+      {/* Simple Header */}
+      <View style={styles.simpleHeader}>
+        <Text style={styles.headerTitle}>Clientes (Versión Original)</Text>
+      </View>
+      
+      <View style={styles.searchContainer}>
+        <View style={styles.searchInputContainer}>
+          <Search size={20} color="#999" style={styles.searchIcon} />
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Buscar por nombre, RUT o actividad"
+            value={searchQuery}
+            onChangeText={setSearchQuery}
           />
-        </View>
-      </View>
-
-      {/* Métricas Globales */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Métricas Globales</Text>
-        <View style={styles.metricsGrid}>
-          {globalMetrics.map((metric, index) => (
-            <View key={index} style={styles.metricCard}>
-              <MetricCard {...metric} />
-            </View>
-          ))}
-        </View>
-      </View>
-
-      {/* Top Clientes */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Top Clientes</Text>
-        <View style={styles.topClientsContainer}>
-          {topClients.map((client) => (
-            <TouchableOpacity
-              key={client.id}
-              style={styles.clientCardContainer}
-              onPress={() => handleClientPress(client)}
-              activeOpacity={0.7}
-            >
-              {renderClientCard(client)}
-            </TouchableOpacity>
-          ))}
-        </View>
-      </View>
-
-      {/* Lista de Clientes */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Todos los Clientes</Text>
-        
-        {/* Campo de Búsqueda */}
-        <View style={styles.searchContainer}>
-          <View style={styles.searchInputContainer}>
-            <Search size={20} color={colors.textSecondary} />
-            <TextInput
-              style={styles.searchInput}
-              placeholder="Buscar clientes por nombre, RUT o municipio..."
-              placeholderTextColor={colors.textSecondary}
-              value={searchTerm}
-              onChangeText={handleSearchChange}
-              autoCapitalize="none"
-              autoCorrect={false}
-            />
-            {searching && (
-              <ActivityIndicator size="small" color={colors.primary} />
-            )}
-          </View>
-          {searchTerm && (
-            <Text style={styles.searchResults}>
-              {searching ? 'Buscando...' : `${filteredClients.length} resultado${filteredClients.length !== 1 ? 's' : ''} encontrado${filteredClients.length !== 1 ? 's' : ''}`}
-            </Text>
+          {isSearching && (
+            <ActivityIndicator size="small" color="#0066CC" style={styles.searchingIndicator} />
           )}
         </View>
-        <View style={styles.clientsListContainer}>
-          {filteredClients.map((client) => (
-            <TouchableOpacity
-              key={client.id}
-              style={styles.clientCardContainer}
-              onPress={() => handleClientPress(client)}
-              activeOpacity={0.7}
-            >
-              {renderClientCard(client)}
-            </TouchableOpacity>
-          ))}
-          {filteredClients.length === 0 && (
+        <TouchableOpacity style={styles.filterButton}>
+          <Filter size={20} color="#0066CC" />
+        </TouchableOpacity>
+      </View>
+      
+      <View style={styles.actionsContainer}>
+        <TouchableOpacity 
+          style={styles.createButton}
+          onPress={() => router.push('/clients/new')}
+        >
+          <Plus size={18} color="#fff" style={styles.createButtonIcon} />
+          <Text style={styles.createButtonText}>Crear Cliente</Text>
+        </TouchableOpacity>
+      </View>
+      
+      {error ? (
+        <View style={styles.errorContainer}>
+          <Text style={styles.errorText}>{error}</Text>
+          <TouchableOpacity 
+            style={styles.retryButton}
+            onPress={() => loadClients(true)}
+          >
+            <Text style={styles.retryButtonText}>Reintentar</Text>
+          </TouchableOpacity>
+        </View>
+      ) : (
+        <FlatList
+          data={clients}
+          renderItem={renderItem}
+          keyExtractor={item => item.id.toString()}
+          contentContainerStyle={styles.listContainer}
+          initialNumToRender={8}
+          maxToRenderPerBatch={5}
+          windowSize={5}
+          refreshControl={
+            <RefreshControl 
+              refreshing={isRefreshing} 
+              onRefresh={onRefresh}
+              colors={['#0066CC']}
+              tintColor="#0066CC"
+            />
+          }
+          ListEmptyComponent={
             <View style={styles.emptyContainer}>
               <Text style={styles.emptyText}>
-                {searchTerm ? 'No se encontraron clientes que coincidan con la búsqueda' : 'No se encontraron clientes'}
+                {searchQuery 
+                  ? 'No se encontraron clientes que coincidan con la búsqueda'
+                  : 'No hay clientes registrados'}
               </Text>
             </View>
-          )}
-        </View>
-      </View>
-    </ScrollView>
+          }
+        />
+      )}
+      
+      <TouchableOpacity 
+        style={styles.fabButton}
+        onPress={() => router.push('/clients/new')}
+      >
+        <Plus size={24} color="#fff" />
+      </TouchableOpacity>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: '#f9f9f9',
   },
-  
-  header: {
-    backgroundColor: colors.surface,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.lg,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.textDisabled,
+  simpleHeader: {
+    backgroundColor: '#0066CC',
+    paddingHorizontal: 20,
+    paddingVertical: 15,
+    paddingTop: 50,
   },
-  
-  headerContent: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+  headerTitle: {
+    color: '#fff',
+    fontSize: 20,
+    fontWeight: 'bold',
   },
-  
-  title: {
-    ...typography.h1,
-    color: colors.textPrimary,
-  },
-  
-  section: {
-    padding: spacing.md,
-  },
-  
-  sectionTitle: {
-    ...typography.h2,
-    color: colors.textPrimary,
-    marginBottom: spacing.md,
-  },
-  
   searchContainer: {
-    marginBottom: spacing.md,
+    flexDirection: 'row',
+    paddingHorizontal: 20,
+    paddingVertical: 15,
+    backgroundColor: '#fff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
   },
-  
   searchInputContainer: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.surface,
-    borderRadius: borders.radius.lg,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    borderWidth: 1,
-    borderColor: colors.textDisabled,
+    backgroundColor: '#f5f5f5',
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    marginRight: 10,
   },
-  
+  searchIcon: {
+    marginRight: 10,
+  },
   searchInput: {
     flex: 1,
-    marginLeft: spacing.sm,
-    ...typography.body1,
-    color: colors.textPrimary,
+    height: 40,
+    fontSize: 16,
   },
-  
-  searchResults: {
-    ...typography.caption,
-    color: colors.textSecondary,
-    marginTop: spacing.xs,
-    textAlign: 'center',
+  searchingIndicator: {
+    marginLeft: 10
   },
-  
-  metricsGrid: {
+  filterButton: {
+    width: 40,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#f5f5f5',
+    borderRadius: 8,
+  },
+  actionsContainer: {
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    backgroundColor: '#fff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+  },
+  createButton: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#0066CC',
+    borderRadius: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 15,
   },
-  
-  metricCard: {
-    width: '48%',
-    marginBottom: spacing.md,
+  createButtonIcon: {
+    marginRight: 8,
   },
-  
-  topClientsContainer: {
-    gap: spacing.md,
+  createButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
   },
-  
-  clientCardContainer: {
-    marginBottom: spacing.sm,
+  listContainer: {
+    padding: 20,
   },
-  
-  clientCard: {
-    backgroundColor: colors.surface,
-    borderRadius: borders.radius.lg,
-    padding: spacing.md,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 3.84,
+  clientCardPlaceholder: {
+    backgroundColor: '#f5f5f5',
+    borderRadius: 10,
+    padding: 15,
+    marginBottom: 10,
+    height: 120,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  fabButton: {
+    position: 'absolute',
+    bottom: 20,
+    right: 20,
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: '#0066CC',
+    justifyContent: 'center',
+    alignItems: 'center',
+    // Reemplazado shadowProps con boxShadow
+    boxShadow: '0px 2px 4px rgba(0, 0, 0, 0.2)',
     elevation: 5,
   },
-  
-  clientHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: spacing.sm,
-  },
-  
-  clientInfo: {
+  loadingContainer: {
     flex: 1,
-  },
-  
-  clientName: {
-    ...typography.h3,
-    color: colors.textPrimary,
-    marginBottom: spacing.xs,
-  },
-  
-  clientCode: {
-    ...typography.body2,
-    color: colors.textSecondary,
-  },
-  
-  clientLocation: {
-    flexDirection: 'row',
+    justifyContent: 'center',
     alignItems: 'center',
   },
-  
-  locationText: {
-    ...typography.caption,
-    color: colors.textSecondary,
-    marginLeft: spacing.xs,
+  loadingText: {
+    marginTop: 10,
+    fontSize: 16,
+    color: '#666',
   },
-  
-  clientDetails: {
-    gap: spacing.sm,
-  },
-  
-  detailRow: {
-    flexDirection: 'row',
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
     alignItems: 'center',
+    padding: 20,
   },
-  
-  detailText: {
-    ...typography.body2,
-    color: colors.textSecondary,
-    marginLeft: spacing.xs,
+  errorText: {
+    fontSize: 16,
+    color: '#FF3B30',
+    textAlign: 'center',
+    marginBottom: 20,
   },
-  
-  metricsRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+  retryButton: {
+    backgroundColor: '#0066CC',
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 8,
   },
-  
-  metric: {
-    alignItems: 'center',
-  },
-  
-  metricValue: {
-    ...typography.body1,
-    fontWeight: '600',
-    color: colors.textPrimary,
-  },
-  
-  metricLabel: {
-    ...typography.caption,
-    color: colors.textSecondary,
-    marginTop: spacing.xs,
-  },
-  
-  growthRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  
-  growthBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.xs,
-    borderRadius: borders.radius.sm,
-  },
-  
-  growthText: {
-    ...typography.caption,
-    fontWeight: '600',
-    marginLeft: spacing.xs,
-  },
-  
-  topProduct: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  
-  topProductText: {
-    ...typography.caption,
-    color: colors.textSecondary,
-    marginLeft: spacing.xs,
-  },
-  clientsListContainer: {
-    gap: spacing.md,
+  retryButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
   },
   emptyContainer: {
     alignItems: 'center',
     justifyContent: 'center',
-    padding: spacing.xl,
+    padding: 20,
   },
   emptyText: {
-    ...typography.body1,
-    color: colors.textSecondary,
+    fontSize: 16,
+    color: '#999',
     textAlign: 'center',
   },
 });
