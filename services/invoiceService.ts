@@ -64,6 +64,7 @@ export async function generateInvoice(invoiceData: InvoiceRequest) {
 export async function generateTicket(ticketData: TicketRequest) {
   try {
     console.log('Beginning generateTicket in invoiceService');
+    console.log('Ticket data structure:', JSON.stringify(ticketData, null, 2));
     
     // Validate ticket data
     if (!validateTicketData(ticketData)) {
@@ -281,8 +282,8 @@ export function formatTicketData(
     ticketTypeCode?: string;
     paymentMethod?: string;
     paymentCondition?: string;
-    netAmounts?: boolean;
     hasTaxes?: boolean;
+    externalFolio?: string;
   } = {}
 ): TicketRequest {
   console.log('Formatting ticket data with options:', options);
@@ -290,39 +291,54 @@ export function formatTicketData(
   // Default values
   const date = options.date || new Date().toISOString().split('T')[0];
   const ticketTypeCode = options.ticketTypeCode || '3';  // Default code for Boleta Electrónica
-  const netAmounts = options.netAmounts !== undefined ? options.netAmounts : false;
   const hasTaxes = options.hasTaxes !== undefined ? options.hasTaxes : true;
   
-  // Format product details
-  const details = productsData.map((product, index) => ({
-    position: index + 1,
-    product: {
-      code: product.code || product.id?.toString() || `PROD${index + 1}`,
-      name: product.name,
-      price: product.price,
-      unit: product.unit ? { code: product.unit.code || 'UN' } : { code: 'UN' },
-      category: product.category ? {
+  // Format product details with complete structure
+  const details = productsData.map((product, index) => {
+    const productDetail = {
+      position: index + 1,
+      product: {
+        id: product.id,
+        code: product.code || product.id?.toString() || `PROD${index + 1}`,
+        name: product.name,
+        price: product.price,
+        unit: {
+          id: product.unit?.id || 1,
+          name: product.unit?.name || 'Unidad',
+          code: product.unit?.code || 'Unid'
+        }
+      },
+      quantity: product.quantity || 1,
+      description: product.description || ''
+    };
+    
+    // Add category only if it exists
+    if (product.category) {
+      productDetail.product.category = {
         id: product.category.id || 1,
         code: product.category.code || 'CAT',
-        name: product.category.name || 'Categoría',
-        otherTax: product.category.otherTax || product.additionalTax ? {
-          id: product.category.otherTax?.id || 1,
-          code: product.category.otherTax?.code || 'TAX',
-          name: product.category.otherTax?.name || product.additionalTax?.name || 'Impuesto',
-          percent: product.category.otherTax?.percent || (product.additionalTax?.rate * 100) || 0
-        } : undefined
-      } : undefined
-    },
-    quantity: product.quantity || 1,
-    description: product.description
-  }));
+        name: product.category.name || 'Categoría'
+      };
+      
+      // Add otherTax only if it exists
+      if (product.category.otherTax) {
+        productDetail.product.category.otherTax = {
+          id: product.category.otherTax.id || 1,
+          code: product.category.otherTax.code || 'TAX',
+          name: product.category.otherTax.name || 'Impuesto',
+          percent: product.category.otherTax.percent || 0
+        };
+      }
+    }
+    
+    return productDetail;
+  });
   
   // Log the formatted details for debugging
   console.log('Formatted ticket details:', JSON.stringify(details, null, 2));
   
-  // Construct the ticket request
+  // Construct the ticket request with new schema
   const ticketRequest: TicketRequest = {
-    netAmounts,
     hasTaxes,
     ticketType: {
       code: ticketTypeCode
@@ -331,20 +347,51 @@ export function formatTicketData(
     details
   };
   
+  // Log the base ticket request for debugging
+  console.log('Base ticket request:', JSON.stringify(ticketRequest, null, 2));
+  
+  // Add external folio if provided
+  if (options.externalFolio) {
+    ticketRequest.externalFolio = options.externalFolio;
+  }
+  
   // Add client if provided (optional for boletas)
   if (clientData) {
+    // Get the selected address or primary address
+    let selectedAddress = null;
+    let selectedMunicipality = null;
+    
+    if (clientData.selectedAddressId !== undefined && clientData.additionalAddress) {
+      // Use selected address
+      selectedAddress = clientData.additionalAddress.find(addr => addr.id === clientData.selectedAddressId);
+      if (selectedAddress) {
+        selectedMunicipality = selectedAddress.municipality;
+      }
+    } else if (clientData.address) {
+      // Use primary address
+      selectedAddress = { address: clientData.address };
+      selectedMunicipality = clientData.municipality;
+    }
+    
+    // Simplify client data to match the expected schema
     ticketRequest.client = {
+      id: clientData.id,
       code: clientData.code || clientData.rut || '66666666-6',
       name: clientData.name || 'Cliente Final',
-      address: clientData.address,
-      municipality: clientData.municipality?.name
+      address: selectedAddress?.address || clientData.address,
+      email: clientData.email,
+      line: clientData.line,
+      municipality: selectedMunicipality ? {
+        id: selectedMunicipality.id,
+        name: selectedMunicipality.name,
+        code: selectedMunicipality.code
+      } : undefined
     };
+    
+    console.log('Client data added:', JSON.stringify(ticketRequest.client, null, 2));
   } else {
-    // Add default client for boletas
-    ticketRequest.client = {
-      code: '66666666-6',
-      name: 'Cliente Final'
-    };
+    // For boletas, client is optional - don't add any client data
+    console.log('No client data - creating boleta without client');
   }
   
   // Add payment method and condition if provided

@@ -72,6 +72,15 @@ GET /services/common/client
 
 // Buscar clientes por término
 GET /services/common/client/{searchTerm}
+
+// Crear nuevo cliente
+POST /services/common/company/{companyId}/client
+
+// Obtener municipios
+GET /services/common/municipality
+
+// Obtener actividades económicas
+GET /services/common/activity
 ```
 
 **Respuesta**:
@@ -86,15 +95,60 @@ interface Client {
   municipality?: Municipality;
   activity?: Activity;
   line?: string;       // "Empresa" o "Persona"
+  additionalAddress?: Address[];
 }
 
 interface Municipality {
+  id: number;
   code: string;
   name: string;
   regionalEntity?: {
     code: string;
     name: string;
   };
+}
+
+interface Activity {
+  id: number;
+  code: string;
+  name: string;
+}
+
+interface Address {
+  id: number;
+  address: string;
+  municipality: Municipality;
+}
+```
+
+**Datos para crear cliente**:
+```typescript
+{
+  code: "12345678-9",           // RUT sin formato
+  name: "Empresa ABC S.A.C.",   // Nombre/Razón Social
+  email: "contacto@empresa.com",
+  phone: "912345678",
+  line: "Venta de productos",   // Actividad económica
+  address: "Calle Principal 123", // Dirección principal
+  municipality: {               // Municipio seleccionado
+    id: 1,
+    name: "Santiago",
+    code: "STGO"
+  },
+  activity: {                   // Actividad seleccionada
+    id: 1,
+    name: "Comercio",
+    code: "COM"
+  },
+  additionalAddress: [          // Direcciones adicionales
+    {
+      address: "Otra dirección",
+      municipality: {
+        name: "Valparaíso",
+        code: "VAL"
+      }
+    }
+  ]
 }
 ```
 
@@ -431,32 +485,90 @@ const getSales = async (forceRefresh = false): Promise<Document[]> => {
 };
 ```
 
-### 4. **Detalles de Documentos**
+### 4. **Búsqueda de Ventas**
+```typescript
+// Búsqueda general de ventas (por folio, RUT, tipo)
+const searchSales = async (searchTerm: string): Promise<Document[]> => {
+  const companyId = USER_COMPANY_ID || COMPANY_ID;
+  const endpoint = `/services/common/company/${companyId}/lastsales/${encodeURIComponent(searchTerm)}`;
+  
+  const fetcher = async () => {
+    const response = await axiosInstance.get(endpoint);
+    return response.data?.documents || response.data || [];
+  };
+  
+  return await fetcher(); // Sin cache para resultados frescos
+};
+
+// Búsqueda específica de documentos (por RUT y nombre del cliente)
+const searchDocuments = async (searchTerm: string): Promise<Document[]> => {
+  const companyId = USER_COMPANY_ID || COMPANY_ID;
+  const endpoint = `/services/common/company/${companyId}/document/${encodeURIComponent(searchTerm)}`;
+  
+  try {
+    const response = await axiosInstance.get(endpoint);
+    if (response.data) {
+      return response.data?.documents || response.data || [];
+    }
+    throw new Error('No data received from document search');
+  } catch (error) {
+    // Fallback a búsqueda general si falla
+    return searchSales(searchTerm);
+  }
+};
+
+// Búsqueda de facturas históricas (RECOMENDADA - por RUT y nombre del cliente)
+const searchInvoices = async (searchTerm: string): Promise<Document[]> => {
+  const endpoint = `/services/invoice/${encodeURIComponent(searchTerm)}`;
+  
+  try {
+    const response = await axiosInstance.get(endpoint);
+    if (response.data) {
+      return response.data?.documents || response.data || [];
+    }
+    throw new Error('No data received from invoice search');
+  } catch (error) {
+    // Fallback a búsqueda de últimas ventas si falla
+    return searchSales(searchTerm);
+  }
+};
+```
+
+**✅ Estado:** Implementado con fallback inteligente
+**✅ Propósito:** Búsqueda específica por RUT y nombre del cliente
+**✅ Fallback:** A búsqueda general si la API específica falla
+**✅ Logs:** Para debugging y monitoreo de endpoints
+
+**⚠️ NOTA:** La API de documentos (`/services/common/company/{id}/document/{search}`) enlista documentos muy antiguos y no es recomendada para búsquedas de ventas recientes.
+
+**✅ RECOMENDADA:** Usar `searchInvoices` con `/services/invoice/{search}` que:
+- Solo muestra facturas recientes
+- Ordena por folio (mayor a menor)
+- Búsqueda específica por RUT y nombre
+- Información completa de la factura
+
+### 4. **Detalles de Documentos (IMPLEMENTADO)**
 ```typescript
 // Función genérica para obtener detalles de cualquier documento
 const getDocumentDetail = async (assignedFolio: string, documentType: string): Promise<Document> => {
   const companyId = USER_COMPANY_ID || COMPANY_ID;
   const cacheKey = `${INVOICE_DETAILS_CACHE_KEY}_${documentType}_${assignedFolio}`;
   
-  // Determinar endpoint basado en el tipo de documento
+  // Determinar endpoint basado en el tipo de documento con priorización
   let endpoint: string;
-  switch (documentType.toUpperCase()) {
-    case 'FACTURA':
-    case 'FACTURA_EXENTA':
-    case 'FACTURA_NO_AFECTA':
-      endpoint = `/services/common/company/${companyId}/invoice/${assignedFolio}/getInfo`;
-      break;
-    case 'BOLETA':
-      endpoint = `/services/common/company/${companyId}/ticket/${assignedFolio}/getInfo`;
-      break;
-    case 'NOTE':
-      endpoint = `/services/common/company/${companyId}/note/${assignedFolio}/getInfo`;
-      break;
-    case 'WAYBILL':
-      endpoint = `/services/common/company/${companyId}/waybill/${assignedFolio}/getInfo`;
-      break;
-    default:
-      endpoint = `/services/common/company/${companyId}/document/${assignedFolio}/getInfo?type=${encodeURIComponent(documentType)}`;
+  const docTypeUpper = documentType.toUpperCase();
+  
+  // Priorizar tipos específicos antes que los genéricos
+  if (docTypeUpper.includes('NOTA') || docTypeUpper.includes('CRÉDITO') || docTypeUpper.includes('NOTE')) {
+    endpoint = `/services/common/company/${companyId}/note/${assignedFolio}/getInfo`;
+  } else if (docTypeUpper.includes('BOLETA') || docTypeUpper.includes('TICKET')) {
+    endpoint = `/services/common/company/${companyId}/ticket/${assignedFolio}/getInfo`;
+  } else if (docTypeUpper.includes('GUÍA') || docTypeUpper.includes('DESPACHO') || docTypeUpper.includes('WAYBILL')) {
+    endpoint = `/services/common/company/${companyId}/waybill/${assignedFolio}/getInfo`;
+  } else if (docTypeUpper.includes('FACTURA')) {
+    endpoint = `/services/common/company/${companyId}/invoice/${assignedFolio}/getInfo`;
+  } else {
+    endpoint = `/services/common/company/${companyId}/document/${assignedFolio}/getInfo?type=${encodeURIComponent(documentType)}`;
   }
   
   const fetcher = async () => {
@@ -484,6 +596,11 @@ const getWaybillDetail = async (assignedFolio: string): Promise<Document> => {
   return getDocumentDetail(assignedFolio, 'WAYBILL');
 };
 ```
+
+**✅ Estado:** Implementado y probado exitosamente
+**✅ Tipos soportados:** FACTURA, BOLETA, NOTE, WAYBILL
+**✅ Detección inteligente:** Priorización de tipos específicos
+**✅ Logs detallados:** Para debugging y monitoreo
 
 ### 5. **Crear Documentos**
 ```typescript

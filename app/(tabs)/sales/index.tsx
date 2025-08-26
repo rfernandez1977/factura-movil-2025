@@ -8,19 +8,26 @@ import {
   RefreshControl,
   TouchableOpacity,
   Platform,
-  ScrollView
+  ScrollView,
+  TextInput
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Check, CircleAlert as AlertCircle, ChevronRight, FileText, Zap, Mic, Camera, CreditCard, CirclePlus as PlusCircle } from 'lucide-react-native';
+import { Check, CircleAlert as AlertCircle, ChevronRight, FileText, Zap, Mic, Camera, CreditCard, CirclePlus as PlusCircle, Search, X } from 'lucide-react-native';
 import { api, Document } from '../../../services/api';
 
 export default function LastSalesScreen() {
   const router = useRouter();
   const [documents, setDocuments] = useState<Document[]>([]);
+  const [filteredDocuments, setFilteredDocuments] = useState<Document[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [retryCount, setRetryCount] = useState(0);
+  
+  // Estados para búsqueda
+  const [searchTerm, setSearchTerm] = useState('');
+  const [isSearching, setIsSearching] = useState(false);
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
 
   const fetchSales = async (forceRefresh = false) => {
     try {
@@ -30,9 +37,11 @@ export default function LastSalesScreen() {
       // Ensure we received valid data
       if (Array.isArray(response)) {
         setDocuments(response);
+        setFilteredDocuments(response);
       } else {
         console.warn('Invalid sales data format:', response);
         setDocuments([]);
+        setFilteredDocuments([]);
         setError('Formato de datos inválido recibido del servidor');
       }
     } catch (err: any) {
@@ -51,6 +60,104 @@ export default function LastSalesScreen() {
       setRefreshing(false);
     }
   };
+
+  // Función para detectar si el término es un nombre (no RUT ni folio)
+  const isNameSearch = (term: string): boolean => {
+    const cleanTerm = term.trim();
+    
+    // Si es solo números, probablemente es un folio
+    if (/^\d+$/.test(cleanTerm)) {
+      return false;
+    }
+    
+    // Si tiene formato de RUT (XX.XXX.XXX-X o XXXXXXXX-X)
+    if (/^\d{1,2}\.\d{3}\.\d{3}-[0-9kK]$/.test(cleanTerm) || /^\d{7,8}-[0-9kK]$/.test(cleanTerm)) {
+      return false;
+    }
+    
+    // Si tiene más de 2 caracteres y no es solo números, probablemente es un nombre
+    return cleanTerm.length > 2;
+  };
+
+  // Función para buscar ventas
+  const searchSales = async (term: string) => {
+    if (!term.trim()) {
+      setFilteredDocuments(documents);
+      return;
+    }
+
+    try {
+      setIsSearching(true);
+      setError(null);
+      
+      // Preparar término de búsqueda
+      let searchTerm = term.trim();
+      
+      // Si es búsqueda por nombre, agregar "%" para búsqueda más amplia
+      if (isNameSearch(searchTerm)) {
+        searchTerm = `%${searchTerm}%`;
+        console.log('[SALES] Name search detected, adding wildcards:', searchTerm);
+      } else {
+        console.log('[SALES] RUT/Folio search detected, using exact term:', searchTerm);
+      }
+      
+      // Intentar búsqueda con la API de facturas históricas (mejor para RUT y nombre)
+      console.log('[SALES] Starting search with term:', searchTerm);
+      const searchResults = await api.searchInvoices(searchTerm);
+      console.log('[SALES] Search results received:', {
+        length: searchResults.length,
+        isArray: Array.isArray(searchResults),
+        firstResult: searchResults[0] ? {
+          id: searchResults[0].id,
+          type: searchResults[0].type,
+          clientName: searchResults[0].client?.name,
+          folio: searchResults[0].assignedFolio
+        } : 'no results'
+      });
+      setFilteredDocuments(searchResults);
+      console.log('[SALES] Filtered documents state updated with', searchResults.length, 'results');
+    } catch (err: any) {
+      console.error('Error searching sales:', err);
+      
+      // Fallback: búsqueda local
+      const searchLower = term.toLowerCase();
+      const localResults = documents.filter(doc => 
+        doc.client?.name?.toLowerCase().includes(searchLower) ||
+        doc.client?.rut?.toLowerCase().includes(searchLower) ||
+        doc.assignedFolio?.toLowerCase().includes(searchLower) ||
+        doc.type?.toLowerCase().includes(searchLower)
+      );
+      setFilteredDocuments(localResults);
+    } finally {
+      setIsSearching(false);
+    }
+  };
+
+  // Debounce para búsqueda
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchTerm(searchTerm);
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
+
+  // Efecto para realizar búsqueda cuando cambia el término debounced
+  useEffect(() => {
+    if (debouncedSearchTerm !== searchTerm) {
+      console.log('[SALES] Debounced search term changed:', debouncedSearchTerm);
+      searchSales(debouncedSearchTerm);
+    }
+  }, [debouncedSearchTerm]);
+
+  // Efecto para actualizar documentos filtrados cuando cambian los documentos originales
+  useEffect(() => {
+    if (searchTerm.trim()) {
+      searchSales(searchTerm);
+    } else {
+      setFilteredDocuments(documents);
+    }
+  }, [documents]);
 
   useEffect(() => {
     fetchSales();
@@ -79,6 +186,11 @@ export default function LastSalesScreen() {
     setLoading(true);
     setRetryCount(0);
     fetchSales(true);
+  };
+
+  const clearSearch = () => {
+    setSearchTerm('');
+    setFilteredDocuments(documents);
   };
 
   const formatDate = (dateString: string) => {
@@ -153,9 +265,12 @@ export default function LastSalesScreen() {
 
   const renderItem = ({ item }: { item: Document }) => {
     // Make sure item has all required properties
-    if (!item || !item.client || !item.state) {
+    if (!item || !item.client) {
       return null;
     }
+    
+    // Si no tiene state, crear uno por defecto basado en paid
+    const documentState = item.state || (item.paid ? ['ACCEPTED', 'Pagada'] : ['PENDING', 'Pendiente']);
     
     return (
       <TouchableOpacity 
@@ -177,25 +292,25 @@ export default function LastSalesScreen() {
           </View>
           <View style={[
             styles.statusBadge,
-            item.state[0] === 'ACCEPTED' ? styles.statusAccepted : styles.statusPending
+            documentState[0] === 'ACCEPTED' ? styles.statusAccepted : styles.statusPending
           ]}>
-            {item.state[0] === 'ACCEPTED' ? (
+            {documentState[0] === 'ACCEPTED' ? (
               <Check size={16} color="#4CAF50" style={styles.statusIcon} />
             ) : (
               <AlertCircle size={16} color="#FF9800" style={styles.statusIcon} />
             )}
             <Text style={[
               styles.statusText,
-              item.state[0] === 'ACCEPTED' ? styles.statusTextAccepted : styles.statusTextPending
+              documentState[0] === 'ACCEPTED' ? styles.statusTextAccepted : styles.statusTextPending
             ]}>
-              {item.state[1] || 'Pendiente'}
+              {documentState[1] || 'Pendiente'}
             </Text>
           </View>
         </View>
 
         <View style={styles.clientInfo}>
           <Text style={styles.clientName}>{item.client.name || 'Cliente sin nombre'}</Text>
-          <Text style={styles.clientRut}>RUT: {item.client.rut || 'Sin RUT'}</Text>
+          <Text style={styles.clientRut}>RUT: {item.client.rut || item.client.code || 'Sin RUT'}</Text>
         </View>
 
         <View style={styles.documentFooter}>
@@ -251,12 +366,50 @@ export default function LastSalesScreen() {
         </ScrollView>
       </View>
       
+      {/* Search Section */}
+      <View style={styles.searchContainer}>
+        <View style={styles.searchInputContainer}>
+          <Search size={20} color="#666" style={styles.searchIcon} />
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Buscar facturas por RUT o nombre del cliente..."
+            placeholderTextColor="#999"
+            value={searchTerm}
+            onChangeText={setSearchTerm}
+            autoCapitalize="none"
+            autoCorrect={false}
+          />
+          {searchTerm.length > 0 && (
+            <TouchableOpacity onPress={clearSearch} style={styles.clearButton}>
+              <X size={18} color="#666" />
+            </TouchableOpacity>
+          )}
+        </View>
+        {isSearching && (
+          <View style={styles.searchingIndicator}>
+            <ActivityIndicator size="small" color="#0066CC" />
+            <Text style={styles.searchingText}>Buscando...</Text>
+          </View>
+        )}
+        {searchTerm.length > 0 && !isSearching && (
+          <Text style={styles.resultsInfo}>
+            {filteredDocuments.length === 1 
+              ? '1 resultado encontrado' 
+              : `${filteredDocuments.length} resultados encontrados`}
+          </Text>
+        )}
+      </View>
+
       <View style={styles.recentSalesContainer}>
         <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Últimas Ventas</Text>
-          <TouchableOpacity onPress={() => router.push('/sales/history')}>
-            <Text style={styles.viewAllText}>Ver todas</Text>
-          </TouchableOpacity>
+          <Text style={styles.sectionTitle}>
+            {searchTerm.length > 0 ? 'Resultados de Búsqueda' : 'Últimas Ventas'}
+          </Text>
+          {searchTerm.length === 0 && (
+            <TouchableOpacity onPress={() => router.push('/sales/history')}>
+              <Text style={styles.viewAllText}>Ver todas</Text>
+            </TouchableOpacity>
+          )}
         </View>
 
         {error && (
@@ -283,7 +436,7 @@ export default function LastSalesScreen() {
           </View>
         ) : (
           <FlatList
-            data={documents}
+            data={filteredDocuments} // Use filteredDocuments for rendering
             renderItem={renderItem}
             keyExtractor={item => item.id.toString()}
             contentContainerStyle={styles.listContainer}
@@ -297,9 +450,20 @@ export default function LastSalesScreen() {
             }
             ListEmptyComponent={
               <View style={styles.emptyContainer}>
-                <Text style={styles.emptyText}>No hay ventas registradas</Text>
+                <Text style={styles.emptyText}>
+                  {searchTerm.length > 0 ? 'No se encontraron resultados' : 'No hay ventas registradas'}
+                </Text>
               </View>
             }
+            onLayout={() => {
+              console.log('[SALES] FlatList rendered with', filteredDocuments.length, 'documents');
+              console.log('[SALES] Search term:', searchTerm);
+              console.log('[SALES] First document in list:', filteredDocuments[0] ? {
+                id: filteredDocuments[0].id,
+                type: filteredDocuments[0].type,
+                clientName: filteredDocuments[0].client?.name
+              } : 'no documents');
+            }}
           />
         )}
       </View>
@@ -554,5 +718,55 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#666',
     textAlign: 'center',
+  },
+  searchContainer: {
+    paddingHorizontal: 20,
+    paddingBottom: 15,
+  },
+  searchInputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    paddingHorizontal: 15,
+    paddingVertical: 12,
+    marginBottom: 10,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.05,
+    shadowRadius: 3,
+    elevation: 2,
+  },
+  searchIcon: {
+    marginRight: 10,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 16,
+    color: '#333',
+    paddingVertical: 0,
+  },
+  clearButton: {
+    padding: 5,
+  },
+  searchingIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 8,
+  },
+  searchingText: {
+    marginLeft: 8,
+    fontSize: 14,
+    color: '#666',
+  },
+  resultsInfo: {
+    textAlign: 'center',
+    fontSize: 14,
+    color: '#666',
+    paddingVertical: 8,
   },
 });

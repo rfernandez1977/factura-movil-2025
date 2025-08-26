@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   View, 
   Text, 
@@ -11,10 +11,12 @@ import {
   Switch,
   Modal,
   FlatList,
-  Alert
+  Alert,
+  ActivityIndicator
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { ArrowLeft, User, Building2, MapPin, Briefcase, Phone, Mail, CircleUser as UserCircle, Plus, Trash2, X, Check } from 'lucide-react-native';
+import { ArrowLeft, User, Building2, MapPin, Briefcase, Phone, Mail, CircleUser as UserCircle, Plus, Trash2, X, Check, ChevronDown } from 'lucide-react-native';
+import { api } from '../../services/api';
 
 // Interfaz para direcciones
 interface Address {
@@ -55,6 +57,49 @@ export default function NewClientScreen() {
   const [currentAddress, setCurrentAddress] = useState<Address | null>(null);
   const [editingAddressId, setEditingAddressId] = useState<string | null>(null);
   
+  // Estados para integración con backend
+  const [municipalities, setMunicipalities] = useState<any[]>([]);
+  const [activities, setActivities] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [loadingData, setLoadingData] = useState(true);
+  const [showMunicipalityModal, setShowMunicipalityModal] = useState(false);
+  const [showActivityModal, setShowActivityModal] = useState(false);
+  const [selectedMunicipality, setSelectedMunicipality] = useState<any>(null);
+  const [selectedActivity, setSelectedActivity] = useState<any>(null);
+  
+  // Cargar datos del backend al montar el componente
+  useEffect(() => {
+    loadFormData();
+  }, []);
+  
+  const loadFormData = async () => {
+    try {
+      setLoadingData(true);
+      
+      // Cargar municipios y actividades en paralelo
+      const [municipalitiesData, activitiesData] = await Promise.all([
+        api.getMunicipalities(),
+        api.getActivities()
+      ]);
+      
+      setMunicipalities(municipalitiesData);
+      setActivities(activitiesData);
+      
+      console.log('Form data loaded:', {
+        municipalities: municipalitiesData.length,
+        activities: activitiesData.length
+      });
+    } catch (error) {
+      console.error('Error loading form data:', error);
+      Alert.alert(
+        'Error',
+        'No se pudieron cargar los datos del formulario. Algunas opciones pueden no estar disponibles.'
+      );
+    } finally {
+      setLoadingData(false);
+    }
+  };
+  
   // Validación de RUT chileno
   const validateRut = (rutValue: string) => {
     if (!rutValue) return false;
@@ -76,9 +121,9 @@ export default function NewClientScreen() {
     }
     
     let expectedDV = 11 - (sum % 11);
-    expectedDV = expectedDV === 11 ? '0' : expectedDV === 10 ? 'K' : expectedDV.toString();
+    let expectedDVStr = expectedDV === 11 ? '0' : expectedDV === 10 ? 'K' : expectedDV.toString();
     
-    return dv === expectedDV;
+    return dv === expectedDVStr;
   };
   
   // Formatear RUT
@@ -235,22 +280,74 @@ export default function NewClientScreen() {
   };
   
   // Guardar cliente
-  const saveClient = () => {
+  const saveClient = async () => {
     if (!validateForm()) return;
     
-    // Aquí iría la lógica para guardar el cliente en la base de datos
-    // Por ahora, simulamos una operación exitosa
-    
-    Alert.alert(
-      'Cliente Guardado',
-      'El cliente ha sido registrado correctamente',
-      [
-        { 
-          text: 'OK', 
-          onPress: () => router.replace('/clients') 
-        }
-      ]
-    );
+    try {
+      setLoading(true);
+      
+      // Preparar datos del cliente para el backend
+      const clientData = {
+        code: rut.replace(/\./g, '').replace(/-/g, ''), // RUT sin formato
+        name: name,
+        email: email,
+        phone: phone,
+        line: isCompany ? businessActivity : 'Persona Natural',
+        address: addresses.find(addr => addr.isMain)?.street || '',
+        municipality: selectedMunicipality ? {
+          id: selectedMunicipality.id,
+          name: selectedMunicipality.name,
+          code: selectedMunicipality.code
+        } : null,
+        activity: selectedActivity ? {
+          id: selectedActivity.id,
+          name: selectedActivity.name,
+          code: selectedActivity.code
+        } : null,
+        additionalAddress: addresses
+          .filter(addr => !addr.isMain && addr.street && addr.district && addr.city)
+          .map(addr => ({
+            address: addr.street,
+            municipality: {
+              name: addr.city,
+              code: addr.district
+            }
+          }))
+      };
+      
+      console.log('Saving client with data:', JSON.stringify(clientData, null, 2));
+      
+      // Crear cliente en el backend
+      const response = await api.createClient(clientData);
+      
+      console.log('Client created successfully:', response);
+      
+      Alert.alert(
+        'Cliente Guardado',
+        'El cliente ha sido registrado correctamente',
+        [
+          { 
+            text: 'OK', 
+            onPress: () => router.replace('/clients') 
+          }
+        ]
+      );
+      
+    } catch (error: any) {
+      console.error('Error saving client:', error);
+      
+      let errorMessage = 'Error al guardar el cliente';
+      
+      if (error.response?.data?.message) {
+        errorMessage += ': ' + error.response.data.message;
+      } else if (error.message) {
+        errorMessage += ': ' + error.message;
+      }
+      
+      Alert.alert('Error', errorMessage);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -342,14 +439,36 @@ export default function NewClientScreen() {
           {isCompany && (
             <View style={styles.inputContainer}>
               <Text style={styles.inputLabel}>Actividad Económica / Giro *</Text>
-              <TextInput
-                style={styles.input}
-                value={businessActivity}
-                onChangeText={setBusinessActivity}
-                placeholder="Ej. Venta de productos electrónicos"
-              />
+              <TouchableOpacity
+                style={styles.selectorButton}
+                onPress={() => setShowActivityModal(true)}
+              >
+                <Text style={[
+                  styles.selectorButtonText,
+                  !selectedActivity && styles.selectorButtonPlaceholder
+                ]}>
+                  {selectedActivity ? selectedActivity.name : 'Seleccionar actividad'}
+                </Text>
+                <ChevronDown size={20} color="#666" />
+              </TouchableOpacity>
             </View>
           )}
+          
+          <View style={styles.inputContainer}>
+            <Text style={styles.inputLabel}>Municipio</Text>
+            <TouchableOpacity
+              style={styles.selectorButton}
+              onPress={() => setShowMunicipalityModal(true)}
+            >
+              <Text style={[
+                styles.selectorButtonText,
+                !selectedMunicipality && styles.selectorButtonPlaceholder
+              ]}>
+                {selectedMunicipality ? selectedMunicipality.name : 'Seleccionar municipio'}
+              </Text>
+              <ChevronDown size={20} color="#666" />
+            </TouchableOpacity>
+          </View>
           
           <View style={styles.inputContainer}>
             <Text style={styles.inputLabel}>Teléfono *</Text>
@@ -461,10 +580,15 @@ export default function NewClientScreen() {
         
         {/* Botón de Guardar */}
         <TouchableOpacity 
-          style={styles.saveButton}
+          style={[styles.saveButton, loading && styles.saveButtonDisabled]}
           onPress={saveClient}
+          disabled={loading}
         >
-          <Text style={styles.saveButtonText}>Guardar Cliente</Text>
+          {loading ? (
+            <ActivityIndicator size="small" color="#fff" />
+          ) : (
+            <Text style={styles.saveButtonText}>Guardar Cliente</Text>
+          )}
         </TouchableOpacity>
       </ScrollView>
       
@@ -528,7 +652,7 @@ export default function NewClientScreen() {
               <View style={styles.mainAddressContainer}>
                 <Text style={styles.mainAddressLabel}>¿Es dirección principal?</Text>
                 <Switch
-                  value={currentAddress?.isMain}
+                  value={currentAddress?.isMain || false}
                   onValueChange={(value) => 
                     setCurrentAddress(prev => prev ? {...prev, isMain: value} : null)
                   }
@@ -544,6 +668,108 @@ export default function NewClientScreen() {
               >
                 <Text style={styles.saveAddressButtonText}>Guardar</Text>
               </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+      
+      {/* Modal para seleccionar municipio */}
+      <Modal
+        visible={showMunicipalityModal}
+        transparent={true}
+        animationType="slide"
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContainer}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Seleccionar Municipio</Text>
+              <TouchableOpacity
+                style={styles.closeButton}
+                onPress={() => setShowMunicipalityModal(false)}
+              >
+                <X size={24} color="#333" />
+              </TouchableOpacity>
+            </View>
+            
+            <View style={styles.modalContent}>
+              {loadingData ? (
+                <View style={styles.loadingContainer}>
+                  <ActivityIndicator size="large" color="#0066CC" />
+                  <Text style={styles.loadingText}>Cargando municipios...</Text>
+                </View>
+              ) : municipalities.length > 0 ? (
+                <FlatList
+                  data={municipalities}
+                  keyExtractor={(item) => item.id.toString()}
+                  renderItem={({ item }) => (
+                    <TouchableOpacity
+                      style={styles.modalItem}
+                      onPress={() => {
+                        setSelectedMunicipality(item);
+                        setShowMunicipalityModal(false);
+                      }}
+                    >
+                      <Text style={styles.modalItemText}>{item.name}</Text>
+                      {selectedMunicipality?.id === item.id && (
+                        <Check size={20} color="#0066CC" />
+                      )}
+                    </TouchableOpacity>
+                  )}
+                />
+              ) : (
+                <Text style={styles.emptyText}>No hay municipios disponibles</Text>
+              )}
+            </View>
+          </View>
+        </View>
+      </Modal>
+      
+      {/* Modal para seleccionar actividad */}
+      <Modal
+        visible={showActivityModal}
+        transparent={true}
+        animationType="slide"
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContainer}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Seleccionar Actividad</Text>
+              <TouchableOpacity
+                style={styles.closeButton}
+                onPress={() => setShowActivityModal(false)}
+              >
+                <X size={24} color="#333" />
+              </TouchableOpacity>
+            </View>
+            
+            <View style={styles.modalContent}>
+              {loadingData ? (
+                <View style={styles.loadingContainer}>
+                  <ActivityIndicator size="large" color="#0066CC" />
+                  <Text style={styles.loadingText}>Cargando actividades...</Text>
+                </View>
+              ) : activities.length > 0 ? (
+                <FlatList
+                  data={activities}
+                  keyExtractor={(item) => item.id.toString()}
+                  renderItem={({ item }) => (
+                    <TouchableOpacity
+                      style={styles.modalItem}
+                      onPress={() => {
+                        setSelectedActivity(item);
+                        setShowActivityModal(false);
+                      }}
+                    >
+                      <Text style={styles.modalItemText}>{item.name}</Text>
+                      {selectedActivity?.id === item.id && (
+                        <Check size={20} color="#0066CC" />
+                      )}
+                    </TouchableOpacity>
+                  )}
+                />
+              ) : (
+                <Text style={styles.emptyText}>No hay actividades disponibles</Text>
+              )}
             </View>
           </View>
         </View>
@@ -799,5 +1025,57 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 16,
     fontWeight: 'bold',
+  },
+  // Estilos para selectores
+  selectorButton: {
+    backgroundColor: '#f5f5f5',
+    borderRadius: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 12,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  selectorButtonText: {
+    fontSize: 16,
+    color: '#333',
+    flex: 1,
+  },
+  selectorButtonPlaceholder: {
+    color: '#999',
+  },
+  // Estilos para botón deshabilitado
+  saveButtonDisabled: {
+    backgroundColor: '#ccc',
+  },
+  // Estilos para modales de selección
+  modalItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 15,
+    paddingHorizontal: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+  },
+  modalItemText: {
+    fontSize: 16,
+    color: '#333',
+    flex: 1,
+  },
+  loadingContainer: {
+    padding: 20,
+    alignItems: 'center',
+  },
+  loadingText: {
+    fontSize: 14,
+    color: '#666',
+    marginTop: 10,
+  },
+  emptyText: {
+    fontSize: 14,
+    color: '#999',
+    textAlign: 'center',
+    padding: 20,
   },
 });

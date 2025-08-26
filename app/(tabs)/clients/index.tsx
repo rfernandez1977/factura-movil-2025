@@ -146,17 +146,6 @@ export default function ClientsScreen() {
     >
       {/* Client Header */}
       <View style={styles.clientHeader}>
-        <View style={[
-          styles.clientIconContainer, 
-          { backgroundColor: item.line?.toLowerCase().includes('empresa') ? '#E3F2FD' : '#F3E5F5' }
-        ]}>
-          {item.line?.toLowerCase().includes('empresa') ? (
-            <Building2 size={24} color="#0066CC" />
-          ) : (
-            <User size={24} color="#9C27B0" />
-          )}
-        </View>
-        
         <View style={styles.clientBasicInfo}>
           <Text style={styles.clientName} numberOfLines={2}>{item.name}</Text>
           <Text style={styles.clientRut}>RUT: {item.code}</Text>
@@ -594,14 +583,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 12,
   },
-  clientIconContainer: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
-  },
+
   clientBasicInfo: {
     flex: 1,
   },

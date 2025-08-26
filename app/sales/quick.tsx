@@ -1175,10 +1175,12 @@ export default function QuickScreen() {
     // If we have a document ID, navigate to the invoice details page
     if (submittedDocumentId) {
       router.push({
-        pathname: documentType === 'boleta' 
-          ? '/sales/boleta-electronica'
-          : '/sales/invoice-details',
-        params: { id: submittedDocument?.id || '0' }
+        pathname: '/sales/invoice-details',
+        params: { 
+          id: submittedDocument?.id || '0',
+          folio: submittedDocument?.assignedFolio || submittedDocumentId,
+          type: documentType === 'boleta' ? 'BOLETA' : 'FACTURA'
+        }
       });
     }
   };

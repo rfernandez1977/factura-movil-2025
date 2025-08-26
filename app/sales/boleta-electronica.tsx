@@ -383,6 +383,8 @@ export default function BoletaElectronicaScreen() {
       return;
     }
     
+    // Client is optional for boletas, so we don't validate it
+    
     setIsSubmitting(true);
     
     // Prepare ticket data
@@ -393,7 +395,6 @@ export default function BoletaElectronicaScreen() {
         date: emissionDate.toISOString().split('T')[0],
         paymentMethod,
         ticketTypeCode: '3', // Code for Boleta Electrónica
-        netAmounts: false,
         hasTaxes: true
       }
     );
@@ -617,13 +618,13 @@ export default function BoletaElectronicaScreen() {
               </TouchableOpacity>
             </View>
           ) : (
-            <TouchableOpacity 
+                          <TouchableOpacity 
               style={styles.emptyClientCard}
               onPress={() => setShowClientModal(true)}
             >
               <User size={32} color="#999" />
-              <Text style={styles.emptyClientText}>Seleccionar Cliente</Text>
-            </TouchableOpacity>
+              <Text style={styles.emptyClientText}>Seleccionar Cliente (Opcional)</Text>
+                    </TouchableOpacity>
           )}
         </View>
         
@@ -783,7 +784,7 @@ export default function BoletaElectronicaScreen() {
         <View style={styles.invoiceStatusContainer}>
           <View style={styles.statusItem}>
             <View style={[styles.statusDot, client ? styles.statusDotActive : styles.statusDotInactive]} />
-            <Text style={styles.statusText}>Cliente seleccionado</Text>
+            <Text style={styles.statusText}>Cliente seleccionado (opcional)</Text>
           </View>
           <View style={styles.statusItem}>
             <View style={[styles.statusDot, products.length > 0 ? styles.statusDotActive : styles.statusDotInactive]} />
@@ -800,10 +801,10 @@ export default function BoletaElectronicaScreen() {
           style={[
             styles.saveButton, 
             isSubmitting && styles.saveButtonDisabled,
-            (!client || products.length === 0) && styles.saveButtonDisabled
+            (products.length === 0) && styles.saveButtonDisabled
           ]}
           onPress={submitBoleta}
-          disabled={isSubmitting || !client || products.length === 0}
+          disabled={isSubmitting || products.length === 0}
         >
           {isSubmitting ? (
             <ActivityIndicator size="small" color="#fff" />

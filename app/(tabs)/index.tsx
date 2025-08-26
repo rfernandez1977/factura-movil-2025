@@ -1,7 +1,8 @@
-import React, { lazy, Suspense, useCallback, memo } from 'react';
+import React, { lazy, Suspense, useCallback, memo, useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Image, ActivityIndicator, Platform } from 'react-native';
 import { useRouter } from 'expo-router';
 import { FileText, Camera, TrendingUp, Package, Users, Settings, CreditCard, Mic, Zap } from 'lucide-react-native';
+import { api, Document } from '../../services/api';
 
 // Lazy load the StatCard component with better chunking
 const StatCard = lazy(() => import('../../components/StatCard'));
@@ -15,32 +16,73 @@ const StatCardFallback = memo(({ title }: { title: string }) => (
 ));
 
 // Memo-ized RecentDocumentsSection to prevent unnecessary re-renders
-const RecentDocumentsSection = memo(({ invoices, router }: any) => (
-  <View style={styles.section}>
-    <Text style={styles.sectionTitle}>Documentos Recientes</Text>
-    <View style={styles.documentsList}>
-      {invoices.map((invoice: any, index: number) => (
-        <TouchableOpacity 
-          key={index}
-          style={styles.documentItem}
-          onPress={() => router.push({
-            pathname: '/sales/factura-electronica',
-            params: { id: invoice.id }
-          })}
-        >
-          <View style={styles.documentIcon}>
-            <FileText size={24} color="#0066CC" />
+const RecentDocumentsSection = memo(({ documents, router, loading }: any) => {
+  if (loading) {
+    return (
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Documentos Recientes</Text>
+        <View style={styles.documentsList}>
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color="#0066CC" />
+            <Text style={styles.loadingText}>Cargando documentos...</Text>
           </View>
-          <View style={styles.documentInfo}>
-            <Text style={styles.documentTitle}>{invoice.number}</Text>
-            <Text style={styles.documentMeta}>{invoice.client}</Text>
+        </View>
+      </View>
+    );
+  }
+
+  if (!documents || documents.length === 0) {
+    return (
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Documentos Recientes</Text>
+        <View style={styles.documentsList}>
+          <View style={styles.emptyContainer}>
+            <Text style={styles.emptyText}>No hay documentos recientes</Text>
           </View>
-          <Text style={styles.documentAmount}>S/ {invoice.amount.toFixed(2)}</Text>
-        </TouchableOpacity>
-      ))}
+        </View>
+      </View>
+    );
+  }
+
+  return (
+    <View style={styles.section}>
+      <Text style={styles.sectionTitle}>Documentos Recientes</Text>
+      <View style={styles.documentsList}>
+        {documents.slice(0, 3).map((document: Document, index: number) => (
+          <TouchableOpacity 
+            key={document.id}
+            style={styles.documentItem}
+            onPress={() => router.push({
+              pathname: '/sales/invoice-details',
+              params: { 
+                id: document.id.toString(),
+                folio: document.assignedFolio,
+                type: document.type
+              }
+            })}
+          >
+            <View style={styles.documentIcon}>
+              <FileText size={24} color="#0066CC" />
+            </View>
+            <View style={styles.documentInfo}>
+              <Text style={styles.documentTitle}>
+                {document.type === 'FACTURA' ? 'Factura' : 
+                 document.type === 'BOLETA' ? 'Boleta' :
+                 document.type === 'NOTE' ? 'Nota de Crédito' :
+                 document.type === 'WAYBILL' ? 'Guía de Despacho' :
+                 document.type} N° {document.assignedFolio}
+              </Text>
+              <Text style={styles.documentMeta}>{document.client?.name || 'Cliente sin nombre'}</Text>
+            </View>
+            <Text style={styles.documentAmount}>
+              S/ {document.total?.toFixed(2) || '0.00'}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </View>
     </View>
-  </View>
-));
+  );
+});
 
 // Optimized action card component
 const ActionCard = memo(({ title, description, icon, bgColor, onPress }: any) => (
@@ -55,18 +97,34 @@ const ActionCard = memo(({ title, description, icon, bgColor, onPress }: any) =>
 
 function HomeScreen() {
   const router = useRouter();
+  const [recentDocuments, setRecentDocuments] = useState<Document[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  // Cargar documentos recientes
+  const loadRecentDocuments = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const documents = await api.getSales();
+      setRecentDocuments(documents);
+    } catch (err: any) {
+      console.error('Error loading recent documents:', err);
+      setError(err.message || 'Error al cargar documentos recientes');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  // Cargar documentos al montar el componente
+  useEffect(() => {
+    loadRecentDocuments();
+  }, [loadRecentDocuments]);
 
   // Memoize navigation actions for better performance
   const navigate = useCallback((route: string) => () => {
     router.push(route);
   }, [router]);
-
-  // Sample invoice data with stable reference
-  const recentInvoices = React.useMemo(() => [
-    { id: '001', number: 'F001-000001', client: 'Empresa ABC S.A.C.', amount: 1580.00 },
-    { id: '002', number: 'F001-000002', client: 'Comercial XYZ Ltda.', amount: 2340.50 },
-    { id: '003', number: 'F001-000003', client: 'Distribuidora 123 S.A.', amount: 960.75 },
-  ], []);
 
   // Actions data with stable reference
   const actions = React.useMemo(() => [
@@ -171,7 +229,7 @@ function HomeScreen() {
       </View>
 
       {/* Recent Documents Section - Lazy loaded and memoized */}
-      <RecentDocumentsSection invoices={recentInvoices} router={router} />
+      <RecentDocumentsSection documents={recentDocuments} router={router} loading={loading} />
     </ScrollView>
   );
 }
@@ -310,5 +368,29 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
     color: '#0066CC',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 40,
+    minHeight: 120,
+  },
+  loadingText: {
+    marginTop: 10,
+    fontSize: 14,
+    color: '#666',
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 40,
+    minHeight: 120,
+  },
+  emptyText: {
+    fontSize: 16,
+    color: '#666',
+    textAlign: 'center',
   },
 });

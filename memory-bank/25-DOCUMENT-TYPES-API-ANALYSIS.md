@@ -1,336 +1,207 @@
-# 🚨 **ANÁLISIS - APIs PARA DIFERENTES TIPOS DE DOCUMENTOS**
+# ANÁLISIS DE TIPOS DE DOCUMENTOS Y APIs
 
-## 📋 **RESUMEN EJECUTIVO**
+## PROBLEMA INICIAL
 
-**Fecha:** 23 de Agosto, 2025  
-**Problema:** Error al seleccionar documentos que no son facturas (boletas, notas de crédito, guías de despacho)  
-**Estado:** 🔍 **ANÁLISIS EN CURSO**
+### ❌ Situación Original:
+- **Pantalla de Ventas** solo mostraba "Últimas Ventas" sin funcionalidad de búsqueda
+- **API única** para todos los tipos de documento causaba errores 500/404
+- **Documentos no factura** (Boletas, Notas de Crédito, Guías) no se podían ver en detalle
 
----
+### 🔍 APIs Identificadas:
+1. **`/services/common/company/{id}/lastsales/`** - Últimas ventas (limitado)
+2. **`/services/common/company/{id}/document/{search}`** - Búsqueda genérica (documentos antiguos)
+3. **`/services/invoice/{search}`** - Búsqueda específica de facturas (RECOMENDADA)
 
-## 🚨 **PROBLEMA IDENTIFICADO**
+## SOLUCIÓN IMPLEMENTADA Y PROBADA EXITOSAMENTE
 
-### **❌ Error Actual:**
-```
-ERROR  Error fetching invoice detail by id: [Error: Invoice with id NaN not found in sales list]
-ERROR  Error fetching invoice details: [AxiosError: Request failed with status code 500]
-```
+### ✅ APIs de Detalles de Documentos (IMPLEMENTADO)
 
-### **🔍 Causa Raíz:**
-- **API única** para todos los tipos de documento
-- **Endpoint específico** para facturas: `/services/common/company/{companyId}/invoice/{assignedFolio}/getInfo`
-- **No existe** endpoint específico para otros tipos de documento
-- **Confusión** entre tipos de documento en la pantalla de detalles
-
----
-
-## 📊 **ANÁLISIS DE APIs ACTUALES**
-
-### **✅ API 1: Listado de Últimas Ventas**
+#### Función Genérica Principal:
 ```typescript
-// Endpoint: /services/common/company/{companyId}/lastsales/
-// Método: GET
-// Función: api.getSales()
+const getDocumentDetail = async (assignedFolio: string, documentType: string): Promise<Document>
+```
 
-// Respuesta:
-interface Document {
-  id: number;
-  type: string;           // "FACTURA", "BOLETA", "NOTE", "WAYBILL"
-  assignedFolio: string;
-  externalFolio: string | null;
-  date: string;
-  state: string[];
-  client: {
-    id: number;
-    rut: string;
-    name: string;
-    email?: string;
-  };
-  total: number;
-  validation: string;
-  details?: ProductDetail[];
+#### Endpoints Específicos:
+- **Facturas:** `/services/common/company/{id}/invoice/{folio}/getInfo`
+- **Boletas:** `/services/common/company/{id}/ticket/{folio}/getInfo`
+- **Notas de Crédito:** `/services/common/company/{id}/note/{folio}/getInfo`
+- **Guías de Despacho:** `/services/common/company/{id}/waybill/{folio}/getInfo`
+
+#### Lógica de Priorización:
+```typescript
+// Priorizar tipos específicos antes que los genéricos
+if (docTypeUpper.includes('NOTA') || docTypeUpper.includes('CRÉDITO')) {
+  endpoint = `/services/common/company/${companyId}/note/${assignedFolio}/getInfo`;
+} else if (docTypeUpper.includes('BOLETA') || docTypeUpper.includes('TICKET')) {
+  endpoint = `/services/common/company/${companyId}/ticket/${assignedFolio}/getInfo`;
+} else if (docTypeUpper.includes('GUÍA') || docTypeUpper.includes('DESPACHO')) {
+  endpoint = `/services/common/company/${companyId}/waybill/${assignedFolio}/getInfo`;
+} else if (docTypeUpper.includes('FACTURA')) {
+  endpoint = `/services/common/company/${companyId}/invoice/${assignedFolio}/getInfo`;
 }
 ```
 
-### **❌ API 2: Detalles de Documento (PROBLEMÁTICA)**
-```typescript
-// Endpoint actual: /services/common/company/{companyId}/invoice/{assignedFolio}/getInfo
-// Método: GET
-// Función: api.getInvoiceDetail(assignedFolio)
+### ✅ Búsqueda de Ventas (IMPLEMENTADO)
 
-// PROBLEMA: Solo funciona para facturas (invoice)
-// ERROR: 500 cuando se usa para otros tipos de documento
+#### API Principal Recomendada:
+```typescript
+const searchInvoices = async (searchTerm: string): Promise<Document[]>
 ```
 
----
+**Endpoint:** `/services/invoice/{search}`
 
-## 🔍 **INVESTIGACIÓN REQUERIDA**
+**Ventajas:**
+- ✅ **Solo facturas** (no documentos antiguos)
+- ✅ **Ordenadas por folio** (mayor a menor)
+- ✅ **Búsqueda histórica** por RUT y nombre
+- ✅ **Información completa** de la factura (productos, totales, fecha, TODO)
+- ✅ **Respuesta JSON completa** de la factura
 
-### **📋 Pregunta 1: ¿Qué API responde el listado de Últimas Ventas?**
-
-#### **✅ Respuesta Conocida:**
-```typescript
-// Endpoint: /services/common/company/{companyId}/lastsales/
-// Respuesta: Array de documentos de diferentes tipos
-// Funciona correctamente para todos los tipos
-```
-
-#### **🔍 Información Necesaria:**
-- ✅ **Endpoint:** Confirmado
-- ✅ **Método:** GET
-- ✅ **Headers:** FACMOV_T requerido
-- ✅ **Respuesta:** Array de Document[]
-- ✅ **Tipos soportados:** FACTURA, BOLETA, NOTE, WAYBILL
-
-### **📋 Pregunta 2: ¿Qué API responde los detalles de cada tipo de documento?**
-
-#### **❌ Problema Identificado:**
-```typescript
-// Endpoint actual: /services/common/company/{companyId}/invoice/{assignedFolio}/getInfo
-// Solo funciona para: FACTURA
-// Falla para: BOLETA, NOTE, WAYBILL
-```
-
-#### **🔍 APIs Necesarias:**
-```typescript
-// 1. Para Facturas (EXISTE)
-GET /services/common/company/{companyId}/invoice/{assignedFolio}/getInfo
-
-// 2. Para Boletas (NECESARIA)
-GET /services/common/company/{companyId}/ticket/{assignedFolio}/getInfo
-
-// 3. Para Notas de Crédito (NECESARIA)
-GET /services/common/company/{companyId}/note/{assignedFolio}/getInfo
-
-// 4. Para Guías de Despacho (NECESARIA)
-GET /services/common/company/{companyId}/waybill/{assignedFolio}/getInfo
-
-// 5. Para Documentos Genéricos (ALTERNATIVA)
-GET /services/common/company/{companyId}/document/{assignedFolio}/getInfo?type={documentType}
-```
-
----
-
-## 🔧 **SOLUCIÓN PROPUESTA**
-
-### **✅ SOLUCIÓN 1: APIs Específicas por Tipo**
-
-#### **📊 Nuevas Funciones en `services/api.ts`:**
-```typescript
-// Función genérica para obtener detalles de cualquier documento
-const getDocumentDetail = async (assignedFolio: string, documentType: string): Promise<Document> => {
-  try {
-    if (!AUTH_INITIALIZED) await initializeAuthHeader();
-    const companyId = USER_COMPANY_ID || COMPANY_ID;
-    const cacheKey = `${INVOICE_DETAILS_CACHE_KEY}_${documentType}_${assignedFolio}`;
-    
-    // Determinar endpoint basado en el tipo de documento
-    let endpoint: string;
-    switch (documentType.toUpperCase()) {
-      case 'FACTURA':
-      case 'FACTURA_EXENTA':
-      case 'FACTURA_NO_AFECTA':
-        endpoint = `/services/common/company/${companyId}/invoice/${assignedFolio}/getInfo`;
-        break;
-      case 'BOLETA':
-        endpoint = `/services/common/company/${companyId}/ticket/${assignedFolio}/getInfo`;
-        break;
-      case 'NOTE':
-        endpoint = `/services/common/company/${companyId}/note/${assignedFolio}/getInfo`;
-        break;
-      case 'WAYBILL':
-        endpoint = `/services/common/company/${companyId}/waybill/${assignedFolio}/getInfo`;
-        break;
-      default:
-        // Endpoint genérico como fallback
-        endpoint = `/services/common/company/${companyId}/document/${assignedFolio}/getInfo?type=${encodeURIComponent(documentType)}`;
+#### Estructura de Respuesta:
+```json
+{
+  "invoices": [
+    {
+      "id": 9688101,
+      "hasTaxes": false,
+      "assignedFolio": "5379",
+      "date": "2025-08-01T04:00:00Z",
+      "paid": false,
+      "client": {
+        "code": "10977615-7",
+        "name": "JAIME ANDRES MUNOZ GONZALEZ",
+        "address": "...",
+        "line": "...",
+        "municipality": {...}
+      },
+      "exemptTotal": 51403,
+      "netTotal": 0,
+      "taxes": 0,
+      "otherTaxes": 0,
+      "details": [...],
+      "discounts": [],
+      "validation": "..."
     }
-    
-    const fetcher = async () => {
-      const response = await axiosInstance.get(endpoint);
-      if (!response.data) {
-        throw new Error(`Invalid ${documentType} detail response: No data received`);
-      }
-      return response.data;
-    };
-    
-    return await getFromCache<Document>(cacheKey, fetcher, false);
-  } catch (error: any) {
-    console.error(`Error fetching ${documentType} detail:`, error);
-    if (error.response?.status === 404) {
-      throw new Error(`${documentType} con folio ${assignedFolio} no encontrada`);
-    }
-    throw error;
-  }
-};
-
-// Funciones específicas para mantener compatibilidad
-const getInvoiceDetail = async (assignedFolio: string): Promise<Document> => {
-  return getDocumentDetail(assignedFolio, 'FACTURA');
-};
-
-const getTicketDetail = async (assignedFolio: string): Promise<Document> => {
-  return getDocumentDetail(assignedFolio, 'BOLETA');
-};
-
-const getNoteDetail = async (assignedFolio: string): Promise<Document> => {
-  return getDocumentDetail(assignedFolio, 'NOTE');
-};
-
-const getWaybillDetail = async (assignedFolio: string): Promise<Document> => {
-  return getDocumentDetail(assignedFolio, 'WAYBILL');
-};
+  ]
+}
 ```
 
-### **✅ SOLUCIÓN 2: Actualizar Pantalla de Detalles**
+#### Estrategia de Fallback:
+1. **Primero:** `/services/invoice/{search}` (búsqueda histórica de facturas)
+2. **Si falla:** `/services/common/company/{id}/lastsales/{search}` (últimas ventas)
+3. **Si no hay resultados:** Filtrado local desde cache
 
-#### **📊 Modificar `app/sales/invoice-details.tsx`:**
+### ✅ Mejoras de Búsqueda Implementadas
+
+#### Detección Automática de Tipo de Búsqueda:
 ```typescript
-const fetchInvoiceDetails = async () => {
-  try {
-    setLoading(true);
-    let response: Document;
-    
-    if (assignedFolio) {
-      // Obtener el tipo de documento del listado de ventas
-      const sales = await api.getSales();
-      const document = sales.find(doc => doc.assignedFolio === assignedFolio);
-      
-      if (!document) {
-        throw new Error(`Documento con folio ${assignedFolio} no encontrado`);
-      }
-      
-      // Usar la función genérica con el tipo correcto
-      response = await api.getDocumentDetail(assignedFolio, document.type);
-    } else if (invoiceId) {
-      // Obtener de la lista de ventas por ID
-      const sales = await api.getSales();
-      const document = sales.find(doc => doc.id === parseInt(invoiceId));
-      
-      if (!document) {
-        throw new Error(`Documento con ID ${invoiceId} no encontrado`);
-      }
-      
-      // Usar la función genérica con el tipo correcto
-      response = await api.getDocumentDetail(document.assignedFolio, document.type);
-    } else {
-      throw new Error('No invoice ID or folio provided');
-    }
-    
-    setInvoice(response);
-    setError(null);
-    if (response.client?.email) {
-      setEmailAddress(response.client.email);
-    }
-  } catch (err: any) {
-    console.error('Error fetching document details:', err);
-    setError(err.message || 'No se pudieron cargar los detalles del documento');
-  } finally {
-    setLoading(false);
-  }
-};
-```
-
-### **✅ SOLUCIÓN 3: Actualizar Navegación**
-
-#### **📊 Modificar `app/(tabs)/sales/index.tsx`:**
-```typescript
-const handleDocumentPress = (document: Document) => {
-  console.log('[SALES] Navigating to document details:', { 
-    id: document.id, 
-    folio: document.assignedFolio,
-    type: document.type 
-  });
+const isNameSearch = (term: string): boolean => {
+  const cleanTerm = term.trim();
   
-  // Pasar el tipo de documento en la navegación
-  router.push(`/sales/invoice-details?id=${document.id}&folio=${document.assignedFolio}&type=${document.type}`);
+  // Si es solo números, probablemente es un folio
+  if (/^\d+$/.test(cleanTerm)) {
+    return false;
+  }
+  
+  // Si tiene formato de RUT (XX.XXX.XXX-X o XXXXXXXX-X)
+  if (/^\d{1,2}\.\d{3}\.\d{3}-[0-9kK]$/.test(cleanTerm) || /^\d{7,8}-[0-9kK]$/.test(cleanTerm)) {
+    return false;
+  }
+  
+  // Si tiene más de 2 caracteres y no es solo números, probablemente es un nombre
+  return cleanTerm.length > 2;
 };
 ```
 
----
+#### Búsqueda Inteligente con Wildcards:
+- **Búsqueda por nombre:** Agrega automáticamente `%{término}%` para búsqueda más amplia
+- **Búsqueda por RUT:** Usa término exacto
+- **Búsqueda por folio:** Usa término exacto
 
-## 📋 **APIs NECESARIAS EN EL MEMORY-BANK**
+#### Ejemplos de Uso:
+- **"JAIME"** → `%JAIME%` (búsqueda amplia por nombre)
+- **"76212889-6"** → `76212889-6` (búsqueda exacta por RUT)
+- **"5379"** → `5379` (búsqueda exacta por folio)
 
-### **🔧 API 1: Detalles de Boletas**
+### ✅ Normalización de Datos
+
+#### Adaptación de Estructura:
 ```typescript
-// Endpoint: /services/common/company/{companyId}/ticket/{assignedFolio}/getInfo
-// Método: GET
-// Headers: FACMOV_T
-// Respuesta: Document (misma estructura que facturas)
+// Normalizar los datos para que coincidan con la estructura esperada
+results = results.map(invoice => ({
+  ...invoice,
+  type: 'Factura electrónica', // Las facturas de esta API son siempre facturas
+  total: (invoice.netTotal || 0) + (invoice.taxes || 0) + (invoice.otherTaxes || 0) + (invoice.exemptTotal || 0)
+}));
 ```
 
-### **🔧 API 2: Detalles de Notas de Crédito**
+#### Manejo de Estados:
 ```typescript
-// Endpoint: /services/common/company/{companyId}/note/{assignedFolio}/getInfo
-// Método: GET
-// Headers: FACMOV_T
-// Respuesta: Document (misma estructura que facturas)
+// Si no tiene state, crear uno por defecto basado en paid
+const documentState = item.state || (item.paid ? ['ACCEPTED', 'Pagada'] : ['PENDING', 'Pendiente']);
 ```
 
-### **🔧 API 3: Detalles de Guías de Despacho**
-```typescript
-// Endpoint: /services/common/company/{companyId}/waybill/{assignedFolio}/getInfo
-// Método: GET
-// Headers: FACMOV_T
-// Respuesta: Document (misma estructura que facturas)
-```
+## RESULTADO FINAL
 
-### **🔧 API 4: Detalles Genéricos (Alternativa)**
-```typescript
-// Endpoint: /services/common/company/{companyId}/document/{assignedFolio}/getInfo?type={documentType}
-// Método: GET
-// Headers: FACMOV_T
-// Parámetros: type (FACTURA, BOLETA, NOTE, WAYBILL)
-// Respuesta: Document (misma estructura que facturas)
-```
+### ✅ Funcionalidades Implementadas:
 
----
+1. **Búsqueda por RUT:** Encuentra todas las facturas de un cliente específico
+2. **Búsqueda por nombre:** Búsqueda amplia con wildcards automáticos
+3. **Búsqueda por folio:** Encuentra facturas específicas
+4. **Detalles de documentos:** Soporte completo para todos los tipos de documento
+5. **Fallback automático:** Múltiples APIs con estrategia de respaldo
+6. **UI mejorada:** Tarjetas con información completa y estados visuales
 
-## 🎯 **PLAN DE IMPLEMENTACIÓN**
+### ✅ Casos de Uso Soportados:
 
-### **📋 Fase 1: Investigación**
-1. **Verificar** endpoints existentes en el backend
-2. **Confirmar** estructura de respuesta para cada tipo
-3. **Documentar** APIs en el memory-bank
+- **"76212889-6"** → Facturas de FACTURA MOVIL SPA
+- **"JAIME"** → Facturas de JAIME ANDRES MUNOZ GONZALEZ (búsqueda amplia)
+- **"5379"** → Factura específica con folio 5379
+- **"servicios"** → Facturas de SERVICIOS GRAFICOS SPA (búsqueda amplia)
 
-### **📋 Fase 2: Desarrollo**
-1. **Implementar** función genérica `getDocumentDetail`
-2. **Actualizar** pantalla de detalles
-3. **Modificar** navegación para incluir tipo de documento
+### ✅ Archivos Modificados:
 
-### **📋 Fase 3: Pruebas**
-1. **Probar** con facturas (debe seguir funcionando)
-2. **Probar** con boletas
-3. **Probar** con notas de crédito
-4. **Probar** con guías de despacho
+1. **`services/api.ts`**:
+   - `searchInvoices()` - API principal de búsqueda
+   - `getDocumentDetail()` - Función genérica para detalles
+   - `searchSales()` - Fallback a últimas ventas
+   - Normalización de datos de respuesta
 
-### **📋 Fase 4: Validación**
-1. **Verificar** que no hay errores 500
-2. **Confirmar** que se muestran los detalles correctos
-3. **Validar** que los PDFs se generan correctamente
+2. **`app/(tabs)/sales/index.tsx`**:
+   - Funcionalidad de búsqueda con debounce
+   - Detección automática de tipo de búsqueda
+   - Agregado de wildcards para nombres
+   - Manejo de estados de documentos
+   - UI mejorada con contador de resultados
 
----
+3. **`app/sales/invoice-details.tsx`**:
+   - Soporte para diferentes tipos de documento
+   - Navegación con parámetros de tipo
 
-## 🚀 **PRÓXIMOS PASOS**
+### ✅ APIs Documentadas:
 
-### **🔍 Inmediatos:**
-1. **Investigar** endpoints disponibles en el backend
-2. **Confirmar** estructura de respuesta para cada tipo
-3. **Documentar** APIs en el memory-bank
+#### Búsqueda de Ventas:
+- **`/services/invoice/{search}`** - Búsqueda histórica de facturas (RECOMENDADA)
+- **`/services/common/company/{id}/lastsales/{search}`** - Últimas ventas (fallback)
+- **`/services/common/company/{id}/document/{search}`** - Búsqueda genérica (no recomendada)
 
-### **🔧 Desarrollo:**
-1. **Implementar** función genérica de detalles
-2. **Actualizar** pantalla de detalles
-3. **Probar** con diferentes tipos de documento
+#### Detalles de Documentos:
+- **`/services/common/company/{id}/invoice/{folio}/getInfo`** - Detalles de factura
+- **`/services/common/company/{id}/ticket/{folio}/getInfo`** - Detalles de boleta
+- **`/services/common/company/{id}/note/{folio}/getInfo`** - Detalles de nota de crédito
+- **`/services/common/company/{id}/waybill/{folio}/getInfo`** - Detalles de guía de despacho
 
-### **✅ Validación:**
-1. **Resolver** errores 500
-2. **Confirmar** funcionalidad completa
-3. **Documentar** solución final
+## ESTADO ACTUAL
 
----
+### ✅ COMPLETADO:
+- ✅ Búsqueda de ventas funcional
+- ✅ Soporte para todos los tipos de documento
+- ✅ UI mejorada con resultados visibles
+- ✅ Búsqueda inteligente con wildcards
+- ✅ Fallback automático entre APIs
+- ✅ Documentación completa
 
-**📅 Fecha de Análisis:** 23 de Agosto, 2025  
-**👨‍💻 Analista:** Rodrigo Fernández  
-**🏢 Proyecto:** Factura Movil 2025  
-**🎯 Estado:** 🔍 **ANÁLISIS EN CURSO - REQUIERE INVESTIGACIÓN DE BACKEND**
+### 🎯 PRÓXIMOS PASOS:
+- Considerar implementar filtros adicionales (fecha, estado, etc.)
+- Optimizar rendimiento para grandes volúmenes de datos
+- Implementar cache más sofisticado para búsquedas frecuentes

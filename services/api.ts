@@ -310,16 +310,24 @@ export interface EnhancedInvoiceRequest {
 }
 
 export interface TicketRequest {
-  netAmounts: boolean;
   hasTaxes: boolean;
   ticketType: {
     code: string;
   };
+  externalFolio?: string;
   client?: {
+    id?: number;
     code: string;
     name: string;
     address?: string;
-    municipality?: string;
+    email?: string;
+    line?: string;
+    municipality?: {
+      id?: number;
+      name: string;
+      code: string;
+    };
+    additionalAddress?: any[];
   };
   date: string;
   details: ProductDetail[];
@@ -492,6 +500,162 @@ const getSales = async (forceRefresh = false): Promise<Document[]> => {
     }
     
     throw error;
+  }
+};
+
+const searchSales = async (searchTerm: string): Promise<Document[]> => {
+  try {
+    if (!AUTH_INITIALIZED) await initializeAuthHeader();
+    const companyId = USER_COMPANY_ID || COMPANY_ID;
+    
+    // Create endpoint url for search
+    const endpoint = `/services/common/company/${companyId}/lastsales/${encodeURIComponent(searchTerm)}`;
+    
+    // Create network fetcher function
+    const fetcher = async () => {
+      const response = await axiosInstance.get(endpoint);
+      if (!response.data) {
+        throw new Error('Invalid response format: No data received for sales search');
+      }
+      return response.data?.documents || response.data || [];
+    };
+    
+    // For search, we don't use cache to get fresh results
+    return await fetcher();
+  } catch (error) {
+    console.error('Error searching sales:', error);
+    
+    // If search fails, try to filter from cached sales
+    try {
+      const cached = await AsyncStorage.getItem(SALES_CACHE_KEY);
+      if (cached) {
+        const allSales: Document[] = JSON.parse(cached);
+        const searchLower = searchTerm.toLowerCase();
+        
+        // Filter by client name or RUT
+        return allSales.filter(sale => 
+          sale.client?.name?.toLowerCase().includes(searchLower) ||
+          sale.client?.rut?.toLowerCase().includes(searchLower) ||
+          sale.assignedFolio?.toLowerCase().includes(searchLower)
+        );
+      }
+    } catch (cacheError) {
+      console.error('Error filtering from cache:', cacheError);
+    }
+    
+    throw error;
+  }
+};
+
+const searchDocuments = async (searchTerm: string): Promise<Document[]> => {
+  try {
+    if (!AUTH_INITIALIZED) await initializeAuthHeader();
+    const companyId = USER_COMPANY_ID || COMPANY_ID;
+    
+    // Try the more specific document search API first
+    const documentEndpoint = `/services/common/company/${companyId}/document/${encodeURIComponent(searchTerm)}`;
+    
+    console.log('[API] Trying document search endpoint:', documentEndpoint);
+    
+    const response = await axiosInstance.get(documentEndpoint);
+    if (response.data) {
+      console.log('[API] Document search successful');
+      return response.data?.documents || response.data || [];
+    }
+    
+    throw new Error('No data received from document search');
+  } catch (error) {
+    console.log('[API] Document search failed, falling back to lastsales search');
+    
+    // Fallback to the original lastsales search
+    return searchSales(searchTerm);
+  }
+};
+
+const searchInvoices = async (searchTerm: string): Promise<Document[]> => {
+  try {
+    if (!AUTH_INITIALIZED) await initializeAuthHeader();
+    
+    // Usar la API específica de facturas históricas
+    const endpoint = `/services/invoice/${encodeURIComponent(searchTerm)}`;
+    
+    console.log('[API] Using invoice search endpoint:', endpoint);
+    console.log('[API] Search term:', searchTerm);
+    
+    const response = await axiosInstance.get(endpoint);
+    console.log('[API] Raw response status:', response.status);
+    console.log('[API] Raw response data type:', typeof response.data);
+    console.log('[API] Raw response data keys:', Object.keys(response.data || {}));
+    console.log('[API] Raw response data:', JSON.stringify(response.data, null, 2));
+    console.log('[API] response.data.data exists:', !!response.data?.data);
+    console.log('[API] response.data.data is array:', Array.isArray(response.data?.data));
+    console.log('[API] response.data.data length:', response.data?.data?.length);
+    console.log('[API] response.data keys:', Object.keys(response.data || {}));
+    console.log('[API] response.data.data keys:', Object.keys(response.data?.data || {}));
+    
+    if (response.data) {
+      console.log('[API] Invoice search successful');
+      console.log('[API] Response data structure:', {
+        hasDocuments: !!response.data.documents,
+        documentsLength: response.data.documents?.length,
+        isArray: Array.isArray(response.data),
+        isArrayDocuments: Array.isArray(response.data.documents),
+        directLength: Array.isArray(response.data) ? response.data.length : 'not array'
+      });
+      
+      // Extraer los datos de la respuesta
+      let results = [];
+      
+      // Intentar diferentes estructuras de respuesta
+      if (response.data?.invoices && Array.isArray(response.data.invoices)) {
+        // Estructura correcta: { invoices: [...] }
+        results = response.data.invoices;
+        console.log('[API] ✅ Found data in response.data.invoices, length:', results.length);
+      } else if (response.data?.data && Array.isArray(response.data.data)) {
+        // Estructura alternativa: { data: [...] }
+        results = response.data.data;
+        console.log('[API] ✅ Found data in response.data.data, length:', results.length);
+      } else if (Array.isArray(response.data)) {
+        // Estructura: [...] (array directo)
+        results = response.data;
+        console.log('[API] ✅ Found data directly in response.data, length:', results.length);
+      } else if (response.data?.documents && Array.isArray(response.data.documents)) {
+        // Estructura: { documents: [...] }
+        results = response.data.documents;
+        console.log('[API] ✅ Found data in response.data.documents, length:', results.length);
+      } else {
+        console.log('[API] ❌ No valid data structure found');
+        console.log('[API] response.data exists:', !!response.data);
+        console.log('[API] response.data type:', typeof response.data);
+        console.log('[API] response.data keys:', Object.keys(response.data || {}));
+        results = [];
+      }
+      console.log('[API] Final results length:', results.length);
+      // Normalizar los datos para que coincidan con la estructura esperada
+      results = results.map(invoice => ({
+        ...invoice,
+        type: 'Factura electrónica', // Las facturas de esta API son siempre facturas
+        total: (invoice.netTotal || 0) + (invoice.taxes || 0) + (invoice.otherTaxes || 0) + (invoice.exemptTotal || 0)
+      }));
+      
+      console.log('[API] First result sample:', results[0] ? {
+        id: results[0].id,
+        type: results[0].type,
+        assignedFolio: results[0].assignedFolio,
+        clientName: results[0].client?.name,
+        total: results[0].total
+      } : 'no results');
+      
+      return results;
+    }
+    
+    throw new Error('No data received from invoice search');
+  } catch (error) {
+    console.log('[API] Invoice search failed, falling back to lastsales search');
+    console.log('[API] Error details:', error);
+    
+    // Fallback a búsqueda de últimas ventas
+    return searchSales(searchTerm);
   }
 };
 
@@ -692,12 +856,68 @@ const clearSalesCache = async () => {
   }
 };
 
+// ========================================
+// FUNCIONES PARA CREACIÓN DE CLIENTES
+// ========================================
+
+const createClient = async (clientData: any): Promise<any> => {
+  try {
+    if (!AUTH_INITIALIZED) await initializeAuthHeader();
+    const companyId = USER_COMPANY_ID || COMPANY_ID;
+    const endpoint = `/services/common/company/${companyId}/client`;
+    
+    console.log('Creating client with data:', JSON.stringify(clientData, null, 2));
+    
+    const response = await axiosInstance.post(endpoint, clientData);
+    
+    // Clear clients cache after creating new client
+    await clearClientsCache();
+    
+    console.log('Client created successfully:', response.data);
+    return response.data;
+  } catch (error) {
+    console.error('Error creating client:', error);
+    throw error;
+  }
+};
+
+const getMunicipalities = async (): Promise<any[]> => {
+  try {
+    if (!AUTH_INITIALIZED) await initializeAuthHeader();
+    const endpoint = '/services/common/municipality';
+    
+    const response = await axiosInstance.get(endpoint);
+    return response.data?.municipalities || response.data || [];
+  } catch (error) {
+    console.error('Error fetching municipalities:', error);
+    // Return empty array if API fails
+    return [];
+  }
+};
+
+const getActivities = async (): Promise<any[]> => {
+  try {
+    if (!AUTH_INITIALIZED) await initializeAuthHeader();
+    const endpoint = '/services/common/activity';
+    
+    const response = await axiosInstance.get(endpoint);
+    return response.data?.activities || response.data || [];
+  } catch (error) {
+    console.error('Error fetching activities:', error);
+    // Return empty array if API fails
+    return [];
+  }
+};
+
 export const api = {
   axiosInstance,
   getProducts,
   searchProducts,
   getClients,
   getSales,
+  searchSales,
+  searchDocuments,
+  searchInvoices,
   getInvoiceDetail,
   getInvoiceDetailById,
   getDocumentDetail,
@@ -710,6 +930,9 @@ export const api = {
   clearSalesCache,
   createInvoice,
   createTicket,
+  createClient,
+  getMunicipalities,
+  getActivities,
   updateAuthData,
   clearAuthData,
   initializeAuthHeader
