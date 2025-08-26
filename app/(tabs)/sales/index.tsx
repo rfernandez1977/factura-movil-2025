@@ -114,8 +114,14 @@ export default function LastSalesScreen() {
   };
 
   const handleDocumentPress = (document: Document) => {
-    console.log('[SALES] Navigating to invoice details:', { id: document.id, folio: document.assignedFolio });
-    router.push(`/sales/invoice-details?id=${document.id}&folio=${document.assignedFolio}`);
+    console.log('[SALES] Navigating to document details:', { 
+      id: document.id, 
+      folio: document.assignedFolio,
+      type: document.type 
+    });
+    
+    // Pasar el tipo de documento en la navegación
+    router.push(`/sales/invoice-details?id=${document.id}&folio=${document.assignedFolio}&type=${document.type}`);
   };
 
   const salesOptions = [

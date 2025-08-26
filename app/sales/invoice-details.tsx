@@ -38,6 +38,7 @@ export default function InvoiceDetailsScreen() {
   const params = useLocalSearchParams();
   const invoiceId = params.id as string;
   const assignedFolio = params.folio as string;
+  const documentType = params.type as string;
   
   const { printerType, printerConfig } = useTheme();
   
@@ -56,16 +57,39 @@ export default function InvoiceDetailsScreen() {
     if (invoiceId || assignedFolio) {
       fetchInvoiceDetails();
     }
-  }, [invoiceId, assignedFolio]);
+  }, [invoiceId, assignedFolio, documentType]);
 
   const fetchInvoiceDetails = async () => {
     try {
       setLoading(true);
       let response: Document;
+      
       if (assignedFolio) {
-        response = await api.getInvoiceDetail(assignedFolio);
+        // Usar el tipo de documento que viene en los parámetros o obtenerlo del listado
+        let docType = documentType;
+        if (!docType) {
+          const sales = await api.getSales();
+          const document = sales.find(doc => doc.assignedFolio === assignedFolio);
+          
+          if (!document) {
+            throw new Error(`Documento con folio ${assignedFolio} no encontrado`);
+          }
+          docType = document.type;
+        }
+        
+        // Usar la función genérica con el tipo correcto
+        response = await api.getDocumentDetail(assignedFolio, docType);
       } else if (invoiceId) {
-        response = await api.getInvoiceDetailById(parseInt(invoiceId));
+        // Obtener de la lista de ventas por ID
+        const sales = await api.getSales();
+        const document = sales.find(doc => doc.id === parseInt(invoiceId));
+        
+        if (!document) {
+          throw new Error(`Documento con ID ${invoiceId} no encontrado`);
+        }
+        
+        // Usar la función genérica con el tipo correcto
+        response = await api.getDocumentDetail(document.assignedFolio, document.type);
       } else {
         throw new Error('No invoice ID or folio provided');
       }
@@ -81,8 +105,8 @@ export default function InvoiceDetailsScreen() {
         setEmailAddress(response.client.email);
       }
     } catch (err: any) {
-      console.error('Error fetching invoice details:', err);
-      setError(err.message || 'No se pudieron cargar los detalles de la factura');
+      console.error('Error fetching document details:', err);
+      setError(err.message || 'No se pudieron cargar los detalles del documento');
     } finally {
       setLoading(false);
     }

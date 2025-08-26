@@ -496,38 +496,7 @@ const getSales = async (forceRefresh = false): Promise<Document[]> => {
 };
 
 const getInvoiceDetail = async (assignedFolio: string): Promise<Document> => {
-  try {
-    if (!AUTH_INITIALIZED) await initializeAuthHeader();
-    const companyId = USER_COMPANY_ID || COMPANY_ID;
-    const cacheKey = `${INVOICE_DETAILS_CACHE_KEY}_${assignedFolio}`;
-    
-    // Create endpoint url
-    const endpoint = `/services/common/company/${companyId}/invoice/${assignedFolio}/getInfo`;
-    
-    // Create network fetcher function
-    const fetcher = async () => {
-      const response = await axiosInstance.get(endpoint);
-      if (!response.data) {
-        throw new Error('Invalid invoice detail response: No data received');
-      }
-      
-      // DEBUG: Log the raw API response
-      console.log('[API] Raw invoice detail response:', JSON.stringify(response.data, null, 2));
-      console.log('[API] Invoice detail type field:', response.data.type);
-      console.log('[API] Invoice detail type field type:', typeof response.data.type);
-      
-      return response.data;
-    };
-    
-    // Get data with caching logic
-    return await getFromCache<Document>(cacheKey, fetcher, false);
-  } catch (error: any) {
-    console.error('Error fetching invoice detail:', error);
-    if (error.response?.status === 404) {
-      throw new Error(`Factura con folio ${assignedFolio} no encontrada`);
-    }
-    throw error;
-  }
+  return getDocumentDetail(assignedFolio, 'FACTURA');
 };
 
 const getInvoiceDetailById = async (invoiceId: number): Promise<Document> => {
@@ -541,22 +510,87 @@ const getInvoiceDetailById = async (invoiceId: number): Promise<Document> => {
     
     // If not in cache, get from sales list
     const sales = await getSales();
-    const invoice = sales.find(doc => doc.id === invoiceId);
-    if (!invoice) {
-      throw new Error(`Invoice with id ${invoiceId} not found in sales list`);
+    const document = sales.find(doc => doc.id === invoiceId);
+    if (!document) {
+      throw new Error(`Document with id ${invoiceId} not found in sales list`);
     }
     
-    // Get detailed information
-    const details = await getInvoiceDetail(invoice.assignedFolio);
+    // Get detailed information using the generic function
+    const details = await getDocumentDetail(document.assignedFolio, document.type);
     
     // Cache the result by ID as well
     await AsyncStorage.setItem(cacheKey, JSON.stringify(details));
     
     return details;
   } catch (error) {
-    console.error('Error fetching invoice detail by id:', error);
+    console.error('Error fetching document detail by id:', error);
     throw error;
   }
+};
+
+// Función genérica para obtener detalles de cualquier documento
+const getDocumentDetail = async (assignedFolio: string, documentType: string): Promise<Document> => {
+  try {
+    if (!AUTH_INITIALIZED) await initializeAuthHeader();
+    const companyId = USER_COMPANY_ID || COMPANY_ID;
+    const cacheKey = `${INVOICE_DETAILS_CACHE_KEY}_${documentType}_${assignedFolio}`;
+    
+    // Determinar endpoint basado en el tipo de documento
+    let endpoint: string;
+    switch (documentType.toUpperCase()) {
+      case 'FACTURA':
+      case 'FACTURA_EXENTA':
+      case 'FACTURA_NO_AFECTA':
+        endpoint = `/services/common/company/${companyId}/invoice/${assignedFolio}/getInfo`;
+        break;
+      case 'BOLETA':
+        endpoint = `/services/common/company/${companyId}/ticket/${assignedFolio}/getInfo`;
+        break;
+      case 'NOTE':
+        endpoint = `/services/common/company/${companyId}/note/${assignedFolio}/getInfo`;
+        break;
+      case 'WAYBILL':
+        endpoint = `/services/common/company/${companyId}/waybill/${assignedFolio}/getInfo`;
+        break;
+      default:
+        // Endpoint genérico como fallback
+        endpoint = `/services/common/company/${companyId}/document/${assignedFolio}/getInfo?type=${encodeURIComponent(documentType)}`;
+    }
+    
+    const fetcher = async () => {
+      const response = await axiosInstance.get(endpoint);
+      if (!response.data) {
+        throw new Error(`Invalid ${documentType} detail response: No data received`);
+      }
+      
+      // DEBUG: Log the raw API response
+      console.log(`[API] Raw ${documentType} detail response:`, JSON.stringify(response.data, null, 2));
+      console.log(`[API] ${documentType} detail type field:`, response.data.type);
+      
+      return response.data;
+    };
+    
+    return await getFromCache<Document>(cacheKey, fetcher, false);
+  } catch (error: any) {
+    console.error(`Error fetching ${documentType} detail:`, error);
+    if (error.response?.status === 404) {
+      throw new Error(`${documentType} con folio ${assignedFolio} no encontrada`);
+    }
+    throw error;
+  }
+};
+
+// Funciones específicas para mantener compatibilidad
+const getTicketDetail = async (assignedFolio: string): Promise<Document> => {
+  return getDocumentDetail(assignedFolio, 'BOLETA');
+};
+
+const getNoteDetail = async (assignedFolio: string): Promise<Document> => {
+  return getDocumentDetail(assignedFolio, 'NOTE');
+};
+
+const getWaybillDetail = async (assignedFolio: string): Promise<Document> => {
+  return getDocumentDetail(assignedFolio, 'WAYBILL');
 };
 
 const getInvoicePdf = async (id: number, validation: string, documentType?: string): Promise<string> => {
@@ -661,6 +695,10 @@ export const api = {
   getSales,
   getInvoiceDetail,
   getInvoiceDetailById,
+  getDocumentDetail,
+  getTicketDetail,
+  getNoteDetail,
+  getWaybillDetail,
   getInvoicePdf,
   clearProductsCache,
   clearClientsCache,
