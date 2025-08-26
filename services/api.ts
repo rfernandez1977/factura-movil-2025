@@ -335,6 +335,47 @@ export interface TicketRequest {
   paymentCondition?: string;
 }
 
+// Interfaces para Guía de Despacho
+export interface TransferType {
+  id: number;
+  code: string;
+  name: string;
+}
+
+export interface DispatchType {
+  id: number;
+  code: string;
+  name: string;
+}
+
+export interface WaybillRequest {
+  transferType: {
+    code: string;
+  };
+  dispatchType?: {
+    code: string;
+  };
+  client: {
+    id?: number;
+    code: string;
+    name: string;
+    address?: string;
+    email?: string;
+    line?: string;
+    municipality?: {
+      id?: number;
+      name: string;
+      code: string;
+    };
+    additionalAddress?: any[];
+  };
+  externalFolio?: string;
+  date: string;
+  details: ProductDetail[];
+  references?: any[];
+  payments?: any[];
+}
+
 export interface Document {
   id: number;
   type: string;
@@ -967,6 +1008,70 @@ const getActivities = async (): Promise<any[]> => {
   }
 };
 
+// ========================================
+// FUNCIONES PARA GUÍA DE DESPACHO
+// ========================================
+
+const getTransferTypes = async (): Promise<TransferType[]> => {
+  try {
+    if (!AUTH_INITIALIZED) await initializeAuthHeader();
+    const endpoint = '/services/transferType';
+    
+    const response = await axiosInstance.get(endpoint);
+    return response.data?.transferTypes || response.data || [];
+  } catch (error) {
+    console.error('Error fetching transfer types:', error);
+    // Return empty array if API fails
+    return [];
+  }
+};
+
+const getDispatchTypes = async (): Promise<DispatchType[]> => {
+  try {
+    if (!AUTH_INITIALIZED) await initializeAuthHeader();
+    const endpoint = '/services/dispatchType';
+    
+    const response = await axiosInstance.get(endpoint);
+    return response.data?.dispatchTypes || response.data || [];
+  } catch (error) {
+    console.error('Error fetching dispatch types:', error);
+    // Return empty array if API fails
+    return [];
+  }
+};
+
+const createWaybill = async (waybillData: WaybillRequest): Promise<any> => {
+  try {
+    if (!AUTH_INITIALIZED) await initializeAuthHeader();
+    const companyId = USER_COMPANY_ID || COMPANY_ID;
+    const endpoint = `/services/raw/company/${companyId}/waybill`;
+    
+    console.log('🔍 Creating waybill with data:', JSON.stringify(waybillData, null, 2));
+    console.log('🔍 Endpoint:', endpoint);
+    console.log('🔍 Company ID:', companyId);
+    console.log('🔍 Token:', USER_TOKEN ? 'Present' : 'Missing');
+    
+    const response = await axiosInstance.post(endpoint, waybillData);
+    
+    console.log('🔍 Raw response:', response);
+    console.log('🔍 Response status:', response.status);
+    console.log('🔍 Response headers:', response.headers);
+    
+    // Clear sales cache after creating new waybill
+    await clearSalesCache();
+    
+    console.log('✅ Waybill created successfully:', response.data);
+    return response.data;
+  } catch (error) {
+    console.error('❌ Error creating waybill:', error);
+    if (error.response) {
+      console.error('❌ Error response:', error.response.data);
+      console.error('❌ Error status:', error.response.status);
+    }
+    throw error;
+  }
+};
+
 export const api = {
   axiosInstance,
   getProducts,
@@ -988,9 +1093,12 @@ export const api = {
   clearSalesCache,
   createInvoice,
   createTicket,
+  createWaybill,
   createClient,
   getMunicipalities,
   getActivities,
+  getTransferTypes,
+  getDispatchTypes,
   updateAuthData,
   clearAuthData,
   initializeAuthHeader

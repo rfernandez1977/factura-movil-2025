@@ -1,4 +1,4 @@
-import { api, InvoiceRequest, TicketRequest, EnhancedInvoiceRequest } from './api';
+import { api, InvoiceRequest, TicketRequest, EnhancedInvoiceRequest, WaybillRequest } from './api';
 import { Alert } from 'react-native';
 
 /**
@@ -475,3 +475,157 @@ export const generateEnhancedInvoice = async (invoiceData: EnhancedInvoiceReques
     return null;
   }
 };
+
+/**
+ * Generate an electronic waybill (guía de despacho)
+ * @param waybillData - The waybill data to submit
+ * @returns A promise with the waybill response or null if an error occurred
+ */
+export async function generateWaybill(waybillData: WaybillRequest): Promise<Document | null> {
+  try {
+    console.log('🚀 Beginning generateWaybill in invoiceService');
+    console.log('📋 Waybill data structure:', JSON.stringify(waybillData, null, 2));
+    
+    // Validate waybill data
+    if (!validateWaybillData(waybillData)) {
+      console.log('Waybill data validation failed');
+      return null;
+    }
+    
+    console.log('✅ Waybill data passed validation');
+    
+    // Ensure API authentication is initialized before proceeding
+    await api.initializeAuthHeader();
+    
+    // Call the API to create the waybill
+    console.log('📡 Calling api.createWaybill with data:', JSON.stringify(waybillData, null, 2));
+    const response = await api.createWaybill(waybillData);
+    
+    // Log success and return response
+    console.log('✅ Waybill created successfully. Response:', JSON.stringify(response, null, 2));
+    
+    if (response && response.success) {
+      return {
+        id: response.id,
+        type: 'waybill',
+        assignedFolio: response.assignedFolio,
+        externalFolio: waybillData.externalFolio || null,
+        date: waybillData.date,
+        state: ['active'],
+        client: {
+          id: waybillData.client.id || 0,
+          rut: waybillData.client.code,
+          name: waybillData.client.name,
+          email: waybillData.client.email
+        },
+        total: waybillData.details.reduce((sum, detail) => sum + (detail.product.price * detail.quantity), 0),
+        validation: response.validation,
+        details: waybillData.details.map(detail => ({
+          position: 0,
+          product: {
+            code: detail.product.code,
+            name: detail.product.name,
+            price: detail.product.price,
+            unit: { code: detail.product.unit?.code || 'Unid' }
+          },
+          quantity: detail.quantity
+        }))
+      };
+    } else {
+      console.error('❌ Waybill creation failed:', response);
+      Alert.alert('Error', 'No se pudo generar la guía de despacho');
+      return null;
+    }
+    
+  } catch (error) {
+    // Enhanced error handling with detailed logging
+    console.error('❌ Error in generateWaybill:', error);
+    
+    let errorMessage = 'Ocurrió un error al intentar generar la guía de despacho. Por favor, intente nuevamente.';
+    
+    if (error instanceof Error) {
+      errorMessage = `Error al generar guía de despacho: ${error.message}`;
+      console.error('Error details:', error.stack);
+    } else {
+      console.error('Unknown error type:', error);
+    }
+    
+    // Show error alert
+    Alert.alert(
+      'Error al generar guía de despacho',
+      errorMessage,
+      [{ text: 'OK' }]
+    );
+    
+    // Rethrow the error for the component to handle
+    throw error;
+  }
+}
+
+/**
+ * Validate waybill data before submission
+ * @param waybillData - The waybill data to validate
+ * @returns true if valid, false otherwise
+ */
+function validateWaybillData(waybillData: WaybillRequest): boolean {
+  console.log('🔍 Validating waybill data...');
+  
+  // Check if waybill data exists
+  if (!waybillData) {
+    console.error('❌ Waybill data is null or undefined');
+    Alert.alert('Error', 'Datos de guía de despacho no válidos');
+    return false;
+  }
+  
+  // Validate transfer type
+  if (!waybillData.transferType || !waybillData.transferType.code) {
+    console.error('❌ Transfer type is missing');
+    Alert.alert('Error', 'Debe seleccionar un tipo de transferencia');
+    return false;
+  }
+  
+  // Validate client
+  if (!waybillData.client || !waybillData.client.name || !waybillData.client.code) {
+    console.error('❌ Client data is missing or incomplete');
+    Alert.alert('Error', 'Datos del cliente incompletos');
+    return false;
+  }
+  
+  // Validate date
+  if (!waybillData.date) {
+    console.error('❌ Date is missing');
+    Alert.alert('Error', 'Debe especificar una fecha');
+    return false;
+  }
+  
+  // Validate details
+  if (!waybillData.details || waybillData.details.length === 0) {
+    console.error('❌ No products in waybill');
+    Alert.alert('Error', 'Debe incluir al menos un producto');
+    return false;
+  }
+  
+  // Validate each product detail
+  for (const detail of waybillData.details) {
+    if (!detail.product || !detail.product.name || !detail.product.code) {
+      console.error('❌ Product data is missing or incomplete');
+      Alert.alert('Error', 'Datos de producto incompletos');
+      return false;
+    }
+    
+    if (detail.quantity <= 0) {
+      console.error('❌ Product quantity must be greater than 0');
+      Alert.alert('Error', 'La cantidad del producto debe ser mayor a 0');
+      return false;
+    }
+    
+    if (detail.product.price <= 0) {
+      console.error('❌ Product price must be greater than 0');
+      Alert.alert('Error', 'El precio del producto debe ser mayor a 0');
+      return false;
+    }
+  }
+  
+  console.log('✅ Waybill data validation passed');
+  return true;
+}

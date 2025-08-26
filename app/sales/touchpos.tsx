@@ -31,7 +31,7 @@ export default function TouchPosScreen() {
       description: 'Documento para el traslado de mercaderías',
       icon: <Package size={32} color="#FF9800" />,
       color: '#FFF3E0',
-      active: false,
+      active: true,
       route: '/sales/guia-despacho'
     },
     {
