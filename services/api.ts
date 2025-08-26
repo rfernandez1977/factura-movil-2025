@@ -537,24 +537,28 @@ const getDocumentDetail = async (assignedFolio: string, documentType: string): P
     
     // Determinar endpoint basado en el tipo de documento
     let endpoint: string;
-    switch (documentType.toUpperCase()) {
-      case 'FACTURA':
-      case 'FACTURA_EXENTA':
-      case 'FACTURA_NO_AFECTA':
-        endpoint = `/services/common/company/${companyId}/invoice/${assignedFolio}/getInfo`;
-        break;
-      case 'BOLETA':
-        endpoint = `/services/common/company/${companyId}/ticket/${assignedFolio}/getInfo`;
-        break;
-      case 'NOTE':
-        endpoint = `/services/common/company/${companyId}/note/${assignedFolio}/getInfo`;
-        break;
-      case 'WAYBILL':
-        endpoint = `/services/common/company/${companyId}/waybill/${assignedFolio}/getInfo`;
-        break;
-      default:
-        // Endpoint genérico como fallback
-        endpoint = `/services/common/company/${companyId}/document/${assignedFolio}/getInfo?type=${encodeURIComponent(documentType)}`;
+    const docTypeUpper = documentType.toUpperCase();
+    
+    // Log para debugging
+    console.log(`[API] Processing document type: "${documentType}" (${docTypeUpper})`);
+    
+    if (docTypeUpper.includes('FACTURA') || docTypeUpper.includes('ELECTRÓNICA')) {
+      // Todos los tipos de factura van al endpoint de invoice
+      endpoint = `/services/common/company/${companyId}/invoice/${assignedFolio}/getInfo`;
+      console.log(`[API] Using invoice endpoint for: ${documentType}`);
+    } else if (docTypeUpper.includes('BOLETA') || docTypeUpper.includes('TICKET')) {
+      endpoint = `/services/common/company/${companyId}/ticket/${assignedFolio}/getInfo`;
+      console.log(`[API] Using ticket endpoint for: ${documentType}`);
+    } else if (docTypeUpper.includes('NOTA') || docTypeUpper.includes('CRÉDITO') || docTypeUpper.includes('NOTE')) {
+      endpoint = `/services/common/company/${companyId}/note/${assignedFolio}/getInfo`;
+      console.log(`[API] Using note endpoint for: ${documentType}`);
+    } else if (docTypeUpper.includes('GUÍA') || docTypeUpper.includes('DESPACHO') || docTypeUpper.includes('WAYBILL')) {
+      endpoint = `/services/common/company/${companyId}/waybill/${assignedFolio}/getInfo`;
+      console.log(`[API] Using waybill endpoint for: ${documentType}`);
+    } else {
+      // Endpoint genérico como fallback
+      endpoint = `/services/common/company/${companyId}/document/${assignedFolio}/getInfo?type=${encodeURIComponent(documentType)}`;
+      console.log(`[API] Using generic endpoint for: ${documentType}`);
     }
     
     const fetcher = async () => {
