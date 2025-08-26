@@ -26,10 +26,6 @@ import {
   Mail, 
   Briefcase, 
   X,
-  Upload,
-  Download,
-  Users,
-  FileText,
   Zap,
   Mic,
   Camera,
@@ -38,41 +34,7 @@ import {
 import { api, Client } from '../../../services/api';
 import { useTheme } from '../../../context/ThemeContext';
 
-// Configuración de opciones de acción para clientes
-const CLIENT_ACTIONS_CONFIG = [
-  {
-    id: 'search',
-    title: "Búsqueda",
-    icon: Search,
-    bgColor: "#1E40AF",
-    description: "Buscar clientes",
-    action: 'search'
-  },
-  {
-    id: 'filter',
-    title: "Filtros",
-    icon: Filter,
-    bgColor: "#2D3748",
-    description: "Filtrar por tipo",
-    action: 'filter'
-  },
-  {
-    id: 'import',
-    title: "Importar",
-    icon: Upload,
-    bgColor: "#4CAF50",
-    description: "Importar clientes",
-    action: 'import'
-  },
-  {
-    id: 'export',
-    title: "Exportar",
-    icon: Download,
-    bgColor: "#FF9800",
-    description: "Exportar lista",
-    action: 'export'
-  }
-];
+
 
 // Configuración de opciones de venta (misma que en sales)
 const SALES_OPTIONS_CONFIG = [
@@ -171,26 +133,7 @@ export default function ClientsScreen() {
     setDebouncedSearchTerm('');
   };
 
-  // Handle action button presses
-  const handleActionPress = (actionId: string) => {
-    switch (actionId) {
-      case 'search':
-        // Focus on search input
-        Alert.alert('Búsqueda', 'La búsqueda ya está disponible en la barra superior');
-        break;
-      case 'filter':
-        Alert.alert('Filtros', 'Funcionalidad de filtros próximamente disponible');
-        break;
-      case 'import':
-        Alert.alert('Importar', 'Funcionalidad de importación próximamente disponible');
-        break;
-      case 'export':
-        Alert.alert('Exportar', 'Funcionalidad de exportación próximamente disponible');
-        break;
-      default:
-        break;
-    }
-  };
+
 
   const handleSalesOptionPress = (route: string) => {
     router.push(route);
@@ -277,18 +220,7 @@ export default function ClientsScreen() {
     </TouchableOpacity>
   );
 
-  const renderActionCard = ({ item }: { item: typeof CLIENT_ACTIONS_CONFIG[0] }) => (
-    <TouchableOpacity
-      style={styles.actionCard}
-      onPress={() => handleActionPress(item.id)}
-    >
-      <View style={[styles.actionIconContainer, { backgroundColor: item.bgColor }]}>
-        <item.icon size={24} color="#FFFFFF" />
-      </View>
-      <Text style={styles.actionTitle}>{item.title}</Text>
-      <Text style={styles.actionDescription}>{item.description}</Text>
-    </TouchableOpacity>
-  );
+
 
   const renderSalesOptionCard = ({ item }: { item: typeof SALES_OPTIONS_CONFIG[0] }) => (
     <TouchableOpacity
@@ -299,6 +231,12 @@ export default function ClientsScreen() {
         <item.icon size={32} color="#FFFFFF" />
       </View>
       <Text style={styles.salesOptionTitle}>{item.title}</Text>
+      <Text style={styles.salesOptionDescription}>
+        {item.title === "Quick" ? "Procesamiento rápido" :
+         item.title === "VozPos" ? "Ventas por voz" :
+         item.title === "VisionPos" ? "Escaneo de documentos" :
+         "Documentos electrónicos"}
+      </Text>
     </TouchableOpacity>
   );
 
@@ -336,20 +274,15 @@ export default function ClientsScreen() {
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.salesOptionsContent}
         >
-          {SALES_OPTIONS_CONFIG.map((option) => renderSalesOptionCard({ item: option }))}
+          {SALES_OPTIONS_CONFIG.map((option) => (
+            <View key={option.title}>
+              {renderSalesOptionCard({ item: option })}
+            </View>
+          ))}
         </ScrollView>
       </View>
       
-      {/* Client Actions Section */}
-      <View style={styles.clientActionsContainer}>
-        <ScrollView 
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.clientActionsContent}
-        >
-          {CLIENT_ACTIONS_CONFIG.map((action) => renderActionCard({ item: action }))}
-        </ScrollView>
-      </View>
+
       
       {/* Search Section */}
       <View style={styles.searchContainer}>
@@ -497,53 +430,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   
-  // Client Actions Section
-  clientActionsContainer: {
-    backgroundColor: '#fff',
-    paddingTop: 15,
-    paddingBottom: 20,
-    marginBottom: 10,
-  },
-  clientActionsContent: {
-    paddingHorizontal: 20,
-    gap: 16,
-  },
-  actionCard: {
-    width: 120,
-    borderRadius: 12,
-    backgroundColor: '#fff',
-    padding: 15,
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 3.84,
-    elevation: 3,
-  },
-  actionIconContainer: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  actionTitle: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 2,
-    textAlign: 'center',
-  },
-  actionDescription: {
-    fontSize: 10,
-    color: '#666',
-    lineHeight: 14,
-    textAlign: 'center',
-  },
+
   
   // Sales Options Section
   salesOptionsContainer: {
@@ -553,38 +440,41 @@ const styles = StyleSheet.create({
     borderBottomColor: '#f0f0f0',
   },
   salesOptionsContent: {
-    paddingHorizontal: 20,
-    gap: 16,
+    paddingHorizontal: 15,
   },
   salesOptionCard: {
-    width: 100,
-    alignItems: 'center',
-    paddingVertical: 16,
-    paddingHorizontal: 12,
-    backgroundColor: '#fff',
+    width: 150,
+    marginRight: 15,
     borderRadius: 12,
+    backgroundColor: '#fff',
+    padding: 15,
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
       height: 2,
     },
-    shadowOpacity: 0.1,
-    shadowRadius: 3.84,
-    elevation: 3,
+    shadowOpacity: 0.05,
+    shadowRadius: 3,
+    elevation: 2,
   },
   salesOptionIconContainer: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+    width: 64,
+    height: 64,
+    borderRadius: 32,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: 12,
   },
   salesOptionTitle: {
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: 'bold',
-    color: '#2D3748',
-    textAlign: 'center',
+    color: '#333',
+    marginBottom: 4,
+  },
+  salesOptionDescription: {
+    fontSize: 12,
+    color: '#666',
+    lineHeight: 16,
   },
   
   // Search Section
