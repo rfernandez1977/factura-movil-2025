@@ -44,35 +44,6 @@ module.exports = async function (env, argv) {
     }
   });
   
-  // Add image optimization for web
-  config.module.rules.push({
-    test: /\.(gif|jpe?g|png|svg)$/,
-    use: {
-      loader: 'image-webpack-loader',
-      options: {
-        disable: process.env.NODE_ENV !== 'production',
-        mozjpeg: {
-          progressive: true,
-          quality: 65,
-        },
-        optipng: {
-          enabled: true,
-        },
-        pngquant: {
-          quality: [0.65, 0.90],
-          speed: 4,
-        },
-        gifsicle: {
-          interlaced: false,
-        },
-        webp: {
-          quality: 75,
-        },
-      },
-    },
-    enforce: 'pre',
-  });
-  
   // Add bundle analyzer plugin when ANALYZE is set to true
   if (process.env.ANALYZE === 'true') {
     config.plugins.push(new BundleAnalyzerPlugin());
