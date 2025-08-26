@@ -85,11 +85,17 @@ export default function InvoiceDetailsScreen() {
         const document = sales.find(doc => doc.id === parseInt(invoiceId));
         
         if (!document) {
-          throw new Error(`Documento con ID ${invoiceId} no encontrado`);
+          // Si no se encuentra por ID, intentar buscar por folio si está disponible
+          if (assignedFolio) {
+            console.log('[INVOICE_DETAILS] ID not found, trying with folio:', assignedFolio);
+            response = await api.getDocumentDetail(assignedFolio, documentType || 'FACTURA');
+          } else {
+            throw new Error(`Documento con ID ${invoiceId} no encontrado`);
+          }
+        } else {
+          // Usar la función genérica con el tipo correcto
+          response = await api.getDocumentDetail(document.assignedFolio, document.type);
         }
-        
-        // Usar la función genérica con el tipo correcto
-        response = await api.getDocumentDetail(document.assignedFolio, document.type);
       } else {
         throw new Error('No invoice ID or folio provided');
       }
