@@ -431,7 +431,61 @@ const getSales = async (forceRefresh = false): Promise<Document[]> => {
 };
 ```
 
-### 4. **Crear Documentos**
+### 4. **Detalles de Documentos**
+```typescript
+// Función genérica para obtener detalles de cualquier documento
+const getDocumentDetail = async (assignedFolio: string, documentType: string): Promise<Document> => {
+  const companyId = USER_COMPANY_ID || COMPANY_ID;
+  const cacheKey = `${INVOICE_DETAILS_CACHE_KEY}_${documentType}_${assignedFolio}`;
+  
+  // Determinar endpoint basado en el tipo de documento
+  let endpoint: string;
+  switch (documentType.toUpperCase()) {
+    case 'FACTURA':
+    case 'FACTURA_EXENTA':
+    case 'FACTURA_NO_AFECTA':
+      endpoint = `/services/common/company/${companyId}/invoice/${assignedFolio}/getInfo`;
+      break;
+    case 'BOLETA':
+      endpoint = `/services/common/company/${companyId}/ticket/${assignedFolio}/getInfo`;
+      break;
+    case 'NOTE':
+      endpoint = `/services/common/company/${companyId}/note/${assignedFolio}/getInfo`;
+      break;
+    case 'WAYBILL':
+      endpoint = `/services/common/company/${companyId}/waybill/${assignedFolio}/getInfo`;
+      break;
+    default:
+      endpoint = `/services/common/company/${companyId}/document/${assignedFolio}/getInfo?type=${encodeURIComponent(documentType)}`;
+  }
+  
+  const fetcher = async () => {
+    const response = await axiosInstance.get(endpoint);
+    return response.data;
+  };
+  
+  return await getFromCache<Document>(cacheKey, fetcher, false);
+};
+
+// Funciones específicas para mantener compatibilidad
+const getInvoiceDetail = async (assignedFolio: string): Promise<Document> => {
+  return getDocumentDetail(assignedFolio, 'FACTURA');
+};
+
+const getTicketDetail = async (assignedFolio: string): Promise<Document> => {
+  return getDocumentDetail(assignedFolio, 'BOLETA');
+};
+
+const getNoteDetail = async (assignedFolio: string): Promise<Document> => {
+  return getDocumentDetail(assignedFolio, 'NOTE');
+};
+
+const getWaybillDetail = async (assignedFolio: string): Promise<Document> => {
+  return getDocumentDetail(assignedFolio, 'WAYBILL');
+};
+```
+
+### 5. **Crear Documentos**
 ```typescript
 const createInvoice = async (invoiceData: InvoiceRequest): Promise<any> => {
   const companyId = USER_COMPANY_ID || COMPANY_ID;
