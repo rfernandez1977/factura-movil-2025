@@ -128,17 +128,20 @@ Response: {"success":false,"code":"000","details":"Error al crear guía de despa
 }
 ```
 
-### **Estructura Enviada (Simplificada):**
+### **Estructura Enviada (CORREGIDA según esquema oficial):**
 ```json
 {
+  "currency": "CLP",
   "transferType": { "code": "1" },
+  "dispatchType": { "code": "2" },
   "client": {
-    "code": "76274690-5",
-    "name": " INVERSIONES ANTILCO LIMITADA",
-    "address": " CARMEN 459, Bloque OF.1",
     "municipality": "Curico",
-    "line": "SERV.AGRICOLAS - ASESORIAS - CORRETAJE Y EXPORTACION PROD. AGRICOLAS"
+    "code": "76274690-5",
+    "name": "INVERSIONES ANTILCO LIMITADA",
+    "line": "SERV.AGRICOLAS",
+    "address": "CARMEN 459, Bloque OF.1"
   },
+  "date": "2025-08-26",
   "details": [
     {
       "position": 1,
@@ -151,13 +154,11 @@ Response: {"success":false,"code":"000","details":"Error al crear guía de despa
       "quantity": 1,
       "description": "petroleo prueba"
     }
-  ],
-  "date": "2025-08-26",
-  "dispatchType": { "code": "2" }
+  ]
 }
 ```
 
-**Conclusión:** La estructura enviada coincide exactamente con el manual.
+**Conclusión:** La estructura enviada coincide exactamente con el esquema oficial proporcionado.
 
 ---
 
@@ -183,6 +184,13 @@ Response: {"success":false,"code":"000","details":"Error al crear guía de despa
   - `"802"` - Producto no válido
   - `"803"` - Tipo de transferencia inválido
   - `"804"` - Fecha inválida
+  - `"805"` - Estructura JSON inválida
+  - `"806"` - Campos requeridos faltantes
+
+#### **5. Verificar Implementación del Endpoint**
+- Confirmar que el endpoint `/services/raw/company/{id}/waybill` esté completamente implementado
+- Verificar que no haya problemas de configuración en el servidor
+- Revisar si hay dependencias faltantes o servicios no iniciados
 
 ---
 
@@ -191,7 +199,8 @@ Response: {"success":false,"code":"000","details":"Error al crear guía de despa
 ### **INMEDIATO:**
 1. **Revisar logs del servidor** para identificar el error específico
 2. **Verificar implementación** del endpoint waybill
-3. **Probar con datos de ejemplo** del manual de integración
+3. **Probar con datos de ejemplo** del esquema oficial
+4. **Verificar configuración del servidor** y servicios dependientes
 
 ### **CORTO PLAZO:**
 4. **Implementar validación detallada** en el backend

@@ -349,6 +349,7 @@ export interface DispatchType {
 }
 
 export interface WaybillRequest {
+  currency?: string;
   transferType: {
     code: string;
   };
@@ -356,24 +357,42 @@ export interface WaybillRequest {
     code: string;
   };
   client: {
-    id?: number;
+    municipality: string;
     code: string;
     name: string;
-    address?: string;
-    email?: string;
-    line?: string;
-    municipality?: {
-      id?: number;
-      name: string;
-      code: string;
-    };
-    additionalAddress?: any[];
+    line: string;
+    address: string;
   };
   externalFolio?: string;
   date: string;
-  details: ProductDetail[];
-  references?: any[];
-  payments?: any[];
+  details: {
+    position: number;
+    product: {
+      code: string;
+      name: string;
+      unit: {
+        code: string;
+      };
+      price: number;
+    };
+    quantity: number;
+    description: string;
+  }[];
+  references?: {
+    position: string;
+    documentType: {
+      code: string;
+    };
+    referencedFolio: string;
+    date: string;
+    description: string;
+  }[];
+  payments?: {
+    position: number;
+    date: string;
+    amount: number;
+    description: string;
+  }[];
 }
 
 export interface Document {

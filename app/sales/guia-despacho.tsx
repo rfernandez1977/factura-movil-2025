@@ -509,17 +509,18 @@ export default function GuiaDespachoScreen() {
       return detail;
     });
     
-    // Crear objeto de guía de despacho - Simplificado según manual
+    // Crear objeto de guía de despacho - Estructura exacta según esquema
     const waybillData: WaybillRequest = {
+      currency: 'CLP', // Moneda por defecto
       transferType: {
         code: selectedTransferType.code
       },
       client: {
+        municipality: clientData.municipality?.name || '',
         code: clientData.code,
         name: clientData.name,
-        address: clientData.address,
-        municipality: clientData.municipality?.name || '',
-        line: clientData.line
+        line: clientData.line || '',
+        address: clientData.address || ''
       },
       details: details.map((detail, index) => ({
         position: index + 1,
@@ -644,16 +645,13 @@ export default function GuiaDespachoScreen() {
       // Mostrar mensaje de éxito
       Alert.alert(
         'Guía de Despacho Generada',
-        `La guía de despacho se ha generado correctamente con el folio ${response.assignedFolio || 'asignado'}`,
+        `La guía de despacho se ha generado correctamente`,
         [
           { 
             text: 'Ver Detalle', 
             onPress: () => {
-              if (response.id) {
-                router.push(`/sales/invoice-details?id=${response.id}&type=WAYBILL`);
-              } else {
-                router.replace('/sales');
-              }
+              // Navegar a la pantalla de detalles con el tipo correcto
+              router.push(`/sales/invoice-details?type=WAYBILL`);
             } 
           },
           {
