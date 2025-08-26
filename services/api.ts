@@ -542,19 +542,20 @@ const getDocumentDetail = async (assignedFolio: string, documentType: string): P
     // Log para debugging
     console.log(`[API] Processing document type: "${documentType}" (${docTypeUpper})`);
     
-    if (docTypeUpper.includes('FACTURA') || docTypeUpper.includes('ELECTRÓNICA')) {
-      // Todos los tipos de factura van al endpoint de invoice
-      endpoint = `/services/common/company/${companyId}/invoice/${assignedFolio}/getInfo`;
-      console.log(`[API] Using invoice endpoint for: ${documentType}`);
+    // Priorizar tipos específicos antes que los genéricos
+    if (docTypeUpper.includes('NOTA') || docTypeUpper.includes('CRÉDITO') || docTypeUpper.includes('NOTE')) {
+      endpoint = `/services/common/company/${companyId}/note/${assignedFolio}/getInfo`;
+      console.log(`[API] Using note endpoint for: ${documentType}`);
     } else if (docTypeUpper.includes('BOLETA') || docTypeUpper.includes('TICKET')) {
       endpoint = `/services/common/company/${companyId}/ticket/${assignedFolio}/getInfo`;
       console.log(`[API] Using ticket endpoint for: ${documentType}`);
-    } else if (docTypeUpper.includes('NOTA') || docTypeUpper.includes('CRÉDITO') || docTypeUpper.includes('NOTE')) {
-      endpoint = `/services/common/company/${companyId}/note/${assignedFolio}/getInfo`;
-      console.log(`[API] Using note endpoint for: ${documentType}`);
     } else if (docTypeUpper.includes('GUÍA') || docTypeUpper.includes('DESPACHO') || docTypeUpper.includes('WAYBILL')) {
       endpoint = `/services/common/company/${companyId}/waybill/${assignedFolio}/getInfo`;
       console.log(`[API] Using waybill endpoint for: ${documentType}`);
+    } else if (docTypeUpper.includes('FACTURA')) {
+      // Solo facturas específicas, no cualquier cosa con "ELECTRÓNICA"
+      endpoint = `/services/common/company/${companyId}/invoice/${assignedFolio}/getInfo`;
+      console.log(`[API] Using invoice endpoint for: ${documentType}`);
     } else {
       // Endpoint genérico como fallback
       endpoint = `/services/common/company/${companyId}/document/${assignedFolio}/getInfo?type=${encodeURIComponent(documentType)}`;
