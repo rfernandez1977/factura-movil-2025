@@ -699,6 +699,12 @@ const getDocumentDetail = async (assignedFolio: string, documentType: string): P
     const companyId = USER_COMPANY_ID || COMPANY_ID;
     const cacheKey = `${INVOICE_DETAILS_CACHE_KEY}_${documentType}_${assignedFolio}`;
     
+    // Logs de diagnóstico detallados
+    console.log(`[API] 🔍 DIAGNÓSTICO - getDocumentDetail:`);
+    console.log(`[API] 📋 Folio recibido: "${assignedFolio}"`);
+    console.log(`[API] 📋 Tipo recibido: "${documentType}"`);
+    console.log(`[API] 📋 Cache key: "${cacheKey}"`);
+    
     // Determinar endpoint basado en el tipo de documento
     let endpoint: string;
     const docTypeUpper = documentType.toUpperCase();
@@ -727,6 +733,8 @@ const getDocumentDetail = async (assignedFolio: string, documentType: string): P
     }
     
     const fetcher = async () => {
+      console.log(`[API] 🔍 DIAGNÓSTICO - Llamando endpoint: "${endpoint}"`);
+      
       const response = await axiosInstance.get(endpoint);
       if (!response.data) {
         throw new Error(`Invalid ${documentType} detail response: No data received`);
@@ -735,6 +743,15 @@ const getDocumentDetail = async (assignedFolio: string, documentType: string): P
       // DEBUG: Log the raw API response
       console.log(`[API] Raw ${documentType} detail response:`, JSON.stringify(response.data, null, 2));
       console.log(`[API] ${documentType} detail type field:`, response.data.type);
+      
+      // Logs de diagnóstico detallados de la respuesta
+      console.log(`[API] 🔍 DIAGNÓSTICO - Respuesta de API:`);
+      console.log(`[API] 📋 Response success:`, response.data.success);
+      console.log(`[API] 📋 Response id:`, response.data.id);
+      console.log(`[API] 📋 Response assignedFolio:`, response.data.assignedFolio);
+      console.log(`[API] 📋 Response type:`, response.data.type);
+      console.log(`[API] 📋 Response validation:`, response.data.validation?.substring(0, 10) + '...');
+      console.log(`[API] 📋 Response keys:`, Object.keys(response.data));
       
       return response.data;
     };
@@ -764,12 +781,53 @@ const getWaybillDetail = async (assignedFolio: string): Promise<Document> => {
 
 const getInvoicePdf = async (id: number, validation: string, documentType?: string): Promise<string> => {
   try {
-    // Construir URL base
-    let pdfUrl = `${API_BASE}/document/toPdf/${id}?v=${validation}`;
+    // Logs de diagnóstico detallados
+    console.log(`[API] 🔍 DIAGNÓSTICO - getInvoicePdf:`);
+    console.log(`[API] 📋 ID recibido: ${id}`);
+    console.log(`[API] 📋 Validation recibido: ${validation?.substring(0, 10)}...`);
+    console.log(`[API] 📋 DocumentType recibido: "${documentType}"`);
+    console.log(`[API] 📋 DocumentType type: ${typeof documentType}`);
     
-    // Agregar tipo de documento si está disponible para diferenciar entre tipos
+    // NUEVA ESTRATEGIA: Usar diferentes endpoints según el tipo de documento
+    let pdfUrl: string;
+    
     if (documentType) {
-      pdfUrl += `&type=${encodeURIComponent(documentType)}`;
+      const normalizedType = documentType.toUpperCase();
+      
+      if (normalizedType.includes('NO AFECTA') || normalizedType.includes('EXENTA')) {
+        // Usar endpoint específico para facturas no afectas/exentas
+        pdfUrl = `${API_BASE}/document/toPdf/${id}?v=${validation}&type=FACTURA_NO_AFECTA`;
+        console.log(`[API] ✅ Usando endpoint específico para FACTURA_NO_AFECTA`);
+      } else if (normalizedType.includes('FACTURA')) {
+        // Usar endpoint específico para facturas electrónicas normales
+        pdfUrl = `${API_BASE}/document/toPdf/${id}?v=${validation}&type=FACTURA`;
+        console.log(`[API] ✅ Usando endpoint específico para FACTURA`);
+      } else {
+        // Fallback al endpoint genérico
+        pdfUrl = `${API_BASE}/document/toPdf/${id}?v=${validation}`;
+        console.log(`[API] ⚠️ Usando endpoint genérico (tipo no reconocido)`);
+      }
+    } else {
+      // Sin tipo de documento, usar endpoint genérico
+      pdfUrl = `${API_BASE}/document/toPdf/${id}?v=${validation}`;
+      console.log(`[API] ⚠️ Usando endpoint genérico (sin tipo de documento)`);
+    }
+    
+    console.log(`[API] 📋 URL final generada: ${pdfUrl}`);
+    
+    // PROBAR: Hacer una llamada de prueba al backend para verificar si procesa el tipo
+    try {
+      console.log(`[API] 🔍 DIAGNÓSTICO - Probando URL con fetch:`);
+      const testResponse = await fetch(pdfUrl, {
+        method: 'HEAD', // Solo verificar headers, no descargar contenido
+        headers: {
+          'FACMOV_T': API_TOKEN
+        }
+      });
+      console.log(`[API] 📋 Test response status: ${testResponse.status}`);
+      console.log(`[API] 📋 Test response headers:`, Object.fromEntries(testResponse.headers.entries()));
+    } catch (testError) {
+      console.log(`[API] ⚠️ Error en test de URL:`, testError);
     }
     
     return pdfUrl;

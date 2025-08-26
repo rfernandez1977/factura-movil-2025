@@ -64,6 +64,13 @@ export default function InvoiceDetailsScreen() {
       setLoading(true);
       let response: Document;
       
+      // Logs de diagnóstico detallados
+      console.log(`[INVOICE_DETAILS] 🔍 DIAGNÓSTICO - fetchInvoiceDetails:`);
+      console.log(`[INVOICE_DETAILS] 📋 invoiceId: "${invoiceId}"`);
+      console.log(`[INVOICE_DETAILS] 📋 assignedFolio: "${assignedFolio}"`);
+      console.log(`[INVOICE_DETAILS] 📋 documentType: "${documentType}"`);
+      console.log(`[INVOICE_DETAILS] 📋 documentType type: ${typeof documentType}`);
+      
       if (assignedFolio) {
         // Usar el tipo de documento que viene en los parámetros o obtenerlo del listado
         let docType = documentType;
@@ -105,7 +112,27 @@ export default function InvoiceDetailsScreen() {
       console.log('[INVOICE_DETAILS] Document type field:', response.type);
       console.log('[INVOICE_DETAILS] Document type field type:', typeof response.type);
       
-      setInvoice(response);
+      // Logs de diagnóstico detallados de la respuesta
+      console.log(`[INVOICE_DETAILS] 🔍 DIAGNÓSTICO - Respuesta final:`);
+      console.log(`[INVOICE_DETAILS] 📋 Response success:`, response.success);
+      console.log(`[INVOICE_DETAILS] 📋 Response id:`, response.id);
+      console.log(`[INVOICE_DETAILS] 📋 Response assignedFolio:`, response.assignedFolio);
+      console.log(`[INVOICE_DETAILS] 📋 Response type:`, response.type);
+      console.log(`[INVOICE_DETAILS] 📋 Response validation:`, response.validation?.substring(0, 10) + '...');
+      console.log(`[INVOICE_DETAILS] 📋 Response keys:`, Object.keys(response));
+      
+      // PRESERVAR el tipo de documento que viene desde la navegación
+      // ya que la API no lo devuelve en la respuesta
+      const documentWithType = {
+        ...response,
+        type: documentType // Usar el tipo que viene desde la navegación
+      };
+      
+      console.log(`[INVOICE_DETAILS] 🔍 DIAGNÓSTICO - Documento con tipo preservado:`);
+      console.log(`[INVOICE_DETAILS] 📋 Tipo original de navegación: "${documentType}"`);
+      console.log(`[INVOICE_DETAILS] 📋 Tipo preservado en documento: "${documentWithType.type}"`);
+      
+      setInvoice(documentWithType);
       setError(null);
       if (response.client?.email) {
         setEmailAddress(response.client.email);
@@ -122,6 +149,15 @@ export default function InvoiceDetailsScreen() {
     if (!invoice) return;
     try {
       setLoadingPdf(true);
+      
+      // Logs de diagnóstico detallados
+      console.log(`[INVOICE_DETAILS] 🔍 DIAGNÓSTICO - handleViewPdf:`);
+      console.log(`[INVOICE_DETAILS] 📋 Invoice completo:`, JSON.stringify(invoice, null, 2));
+      console.log(`[INVOICE_DETAILS] 📋 Invoice id:`, invoice.id);
+      console.log(`[INVOICE_DETAILS] 📋 Invoice type:`, invoice.type);
+      console.log(`[INVOICE_DETAILS] 📋 Invoice type type:`, typeof invoice.type);
+      console.log(`[INVOICE_DETAILS] 📋 Invoice assignedFolio:`, invoice.assignedFolio);
+      console.log(`[INVOICE_DETAILS] 📋 Invoice validation:`, invoice.validation?.substring(0, 10) + '...');
       
       // Validar que tenemos la información correcta del documento
       console.log('[INVOICE_DETAILS] Document info for PDF:', {
