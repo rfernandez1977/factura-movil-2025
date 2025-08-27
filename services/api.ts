@@ -393,6 +393,20 @@ export interface WaybillRequest {
     amount: number;
     description: string;
   }[];
+  // CAMPOS CREATIVOS PARA EVITAR ERRORES DEL BACKEND
+  params?: {
+    exporter?: {
+      data: string;
+    };
+  };
+  stamp?: string | null;
+  subsidiary?: string | null;
+  transport?: string | null;
+  assignedFolio?: string | null;
+  netTotal?: number;
+  taxes?: number;
+  otherTaxes?: number;
+  exemptTotal?: number;
 }
 
 export interface Document {
